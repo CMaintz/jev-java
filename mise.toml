@@ -1,0 +1,35 @@
+# Foundry six-verb interface for jev-java (Gradle). Self-contained: the reusable
+# _java.yml gate expects PMD/no-var + foundry-verb-wrap infra that this single-package
+# library does not carry, so the verbs map directly to Gradle tasks here and in gate.yml.
+# Structural smells come from the Spotless format check plus the generic habit-hooks
+# sensor (file-length + jscpd); see .habit-hooks/config.toml.
+
+[tools]
+java = "21"
+
+[tasks.fix]
+description = "Auto-format (Spotless)"
+run = "./gradlew spotlessApply"
+
+[tasks.lint]
+description = "Format check (Spotless)"
+run = "./gradlew spotlessCheck"
+
+[tasks.typecheck]
+description = "Compilation is Java's type check"
+run = "./gradlew compileJava"
+
+[tasks.test]
+description = "Tests with the jacoco coverage floor"
+run = "./gradlew test jacocoTestCoverageVerification"
+
+[tasks.audit]
+description = "Dependency CVEs (generates the lockfile, then osv-scanner; needs osv-scanner on PATH)"
+run = [
+    "./gradlew dependencies --write-locks",
+    "osv-scanner --lockfile=gradle.lockfile",
+]
+
+[tasks.gate]
+description = "The oracle. Sequential - mise `depends` runs in parallel with no ordering."
+run = ["mise run lint", "mise run typecheck", "mise run test", "mise run audit"]

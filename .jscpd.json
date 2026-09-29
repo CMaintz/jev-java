@@ -1,0 +1,4 @@
+{
+  "gitignore": true,
+  "ignore": ["**/src/test/**", "**/build/**", "**/.gradle/**"]
+}

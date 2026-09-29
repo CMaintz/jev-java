@@ -1,0 +1,23 @@
+# Gradle
+.gradle/
+build/
+# Generated on demand by the audit verb (foundry pattern) so lock drift never breaks the gate
+gradle.lockfile
+
+# Java
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# Local env
+.env
+.env.local
+
+# Foundry loop telemetry
+.foundry/

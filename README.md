@@ -1,0 +1,120 @@
+# jev-java
+
+A small, dependency-free Java client for [TypeSafe AI's](https://typesafe.ai) **Jev**,
+a "System One" model that returns typed judgments instead of free text. You send a
+piece of *state* and a set of typed questions; you get back typed answers with
+calibrated confidence, which your code can act on directly.
+
+> Unofficial community SDK. Not published or endorsed by TypeSafe. Built against the
+> public API at `https://api.typesafe.ai`.
+
+## Why
+
+A chat LLM hands you a paragraph you have to parse and second-guess. Jev hands you a
+value with a shape: an enum choice, a number on a scale, or a yes/no probability, each
+with a confidence you can threshold on. The idiom is to run Jev on everything and
+escalate only the low-confidence cases to a person or a larger model.
+
+## Requirements
+
+Java 21 or newer. No runtime dependencies (built on `java.net.http` and a small
+internal JSON codec).
+
+## Quick start
+
+```java
+import io.github.cmaintz.jev.*;
+import java.util.List;
+import java.util.Map;
+
+var client = TypeSafeClient.fromEnvironment(); // reads TYPESAFE_API_KEY
+
+Map<String, Question> questions = Map.of(
+    "team", new Choice(
+        "Which team should handle this ticket",
+        Map.of(
+            "billing", "Payment or subscription issues",
+            "technical", "Bugs or integration problems",
+            "sales", "Pricing or account questions")),
+    "anger", new Score(
+        "How frustrated the customer appears",
+        List.of("Calm, just stating facts", "Frustrated but civil", "Very angry")),
+    "refund", new Noul("Does the customer ask for a refund?"));
+
+SystemOneResponse response = client.systemOne(
+    Map.of("subject", "Charged twice!", "body", "I want my money back."),
+    questions);
+
+Answer team = response.get("team");
+if (team.isConfident(0.7)) {
+    route(team.choice());            // "billing"
+} else {
+    escalateToHuman();               // distribution was spread out
+}
+
+double anger = response.get("anger").score();          // e.g. 1.8
+boolean wantsRefund = response.get("refund").noul() > 0.5;
+```
+
+The three questions above are answered in a single request. Independent questions are
+evaluated in parallel, so batching them is close to free. For non-blocking calls, use
+`client.systemOneAsync(state, questions)`, which returns a `CompletableFuture`.
+
+## The three primitives
+
+| Type | Ask when | Answer fields |
+| --- | --- | --- |
+| `Choice` | one of a defined set | `choice()`, `probabilities()` (per option), `confidence()` |
+| `Score` | a position on an ordered scale | `score()`, `scoreProbabilities()` (per level), `legend()`, `confidence()` |
+| `Noul` | a yes/no condition | `noul()` (0..1); no confidence |
+
+`Choice` criteria is a map of option to description (max 255 options). `Score` criteria
+is an ordered list of 2 to 10 level descriptions, low to high. The model cannot pick an
+option you did not give it, so include a no-match option when nothing may fit.
+
+## Confidence
+
+`Choice` and `Score` answers carry a `confidence()` in `[0, 1]` derived from how peaked
+the probability distribution is. `Answer.isConfident(threshold)` is a convenience for
+gating. A `Noul` has no confidence; gate it on the probability itself (near 0.5 means
+genuinely uncertain, not "medium yes"). A confidence threshold is not one number: use a
+stricter bar for consequential actions than for harmless ones, and tune it on your data.
+
+## Errors
+
+All failures derive from `JevException`, which carries `statusCode()` and `responseBody()`:
+
+| Exception | HTTP | Meaning |
+| --- | --- | --- |
+| `JevAuthException` | 401 | missing or invalid API key |
+| `JevValidationException` | 422 | the request was rejected as malformed |
+| `JevRateLimitException` | 429 | rate limited; retries exhausted |
+| `JevOverloadedException` | 529 | service overloaded; retries exhausted |
+
+`429` and `529` are retried automatically with exponential backoff; `maxRetries` is
+configurable on the builder.
+
+## Configuration
+
+```java
+var client = TypeSafeClient.builder()
+    .apiKey("sk-...")                      // or omit to read TYPESAFE_API_KEY
+    .model("jev-latest")                   // tracks the recommended model
+    .timeout(Duration.ofSeconds(30))
+    .maxRetries(3)
+    .transport(customTransport)            // inject an HttpTransport to test offline
+    .build();
+```
+
+State may be a `String`, or any tree of `Map` / `List` / `String` / `Number` /
+`Boolean` / `null`; a `Map` gives exact control over field names. Keep the API key
+server-side. The client is thread-safe: build one and reuse it.
+
+## Roadmap
+
+- Publish to Maven Central under `io.github.cmaintz:jev`.
+- Response caching for repeated states; a live end-to-end sample against a real key.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
