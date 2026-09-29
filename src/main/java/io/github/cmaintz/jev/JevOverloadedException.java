@@ -5,8 +5,7 @@ public final class JevOverloadedException extends JevException {
 
     private static final long serialVersionUID = 1L;
 
-    /** @param message description @param responseBody raw body, or null */
-    public JevOverloadedException(String message, String responseBody) {
+    JevOverloadedException(String message, String responseBody) {
         super(message, 529, responseBody, null);
     }
 }

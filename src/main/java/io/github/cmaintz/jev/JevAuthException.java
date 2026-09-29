@@ -5,8 +5,7 @@ public final class JevAuthException extends JevException {
 
     private static final long serialVersionUID = 1L;
 
-    /** @param message description @param responseBody raw body, or null */
-    public JevAuthException(String message, String responseBody) {
+    JevAuthException(String message, String responseBody) {
         super(message, 401, responseBody, null);
     }
 }
