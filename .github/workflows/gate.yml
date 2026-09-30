@@ -25,11 +25,11 @@ jobs:
       - run: ./gradlew spotlessCheck compileJava
       # test + jacoco coverage floor
       - run: ./gradlew test jacocoTestCoverageVerification
-      # audit: generate the lockfile, then scan it with a pinned osv-scanner
+      # audit: scan the committed lockfile with a pinned osv-scanner (lock drift already fails compile/test resolution above)
       - name: audit (osv-scanner)
         run: |
           curl -fsSL -o "$RUNNER_TEMP/osv-scanner" \
             https://github.com/google/osv-scanner/releases/download/v2.5.1/osv-scanner_linux_amd64
           chmod +x "$RUNNER_TEMP/osv-scanner"
-          ./gradlew dependencies --write-locks
+          ./gradlew dependencies > /dev/null
           "$RUNNER_TEMP/osv-scanner" --lockfile=gradle.lockfile
