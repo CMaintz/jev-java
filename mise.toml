@@ -24,9 +24,9 @@ description = "Tests with the jacoco coverage floor"
 run = "./gradlew test jacocoTestCoverageVerification"
 
 [tasks.audit]
-description = "Dependency CVEs (generates the lockfile, then osv-scanner; needs osv-scanner on PATH)"
+description = "Dependency CVEs (verifies the committed lockfile, then osv-scanner; needs osv-scanner on PATH)"
 run = [
-    "./gradlew dependencies --write-locks",
+    "./gradlew dependencies",
     "osv-scanner --lockfile=gradle.lockfile",
 ]
 

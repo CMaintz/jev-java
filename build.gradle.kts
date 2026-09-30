@@ -22,9 +22,13 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
-// Lock dependencies so `audit` (osv-scanner) has a gradle.lockfile to read. The file
-// is generated on demand (gitignored) so lock drift never breaks the gate.
+// Lock dependencies so builds are reproducible and `audit` (osv-scanner) scans exactly what
+// is resolved. Regenerate after a dependency change with `./gradlew dependencies --write-locks`.
 dependencyLocking { lockAllConfigurations() }
+
+// Source is UTF-8 regardless of the platform default (Windows would otherwise use cp1252).
+tasks.withType<JavaCompile>().configureEach { options.encoding = "UTF-8" }
+tasks.withType<Javadoc>().configureEach { options.encoding = "UTF-8" }
 
 tasks.test {
     useJUnitPlatform()
