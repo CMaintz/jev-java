@@ -8,7 +8,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 
 /**
  * A client for TypeSafe AI's Jev "System One" model. Send a {@code state} plus a set of
@@ -55,34 +57,74 @@ public final class TypeSafeClient {
      * over field names). Answers come back keyed by the same ids.
      */
     public SystemOneResponse systemOne(Object state, Map<String, Question> questions) {
+        return ResponseReader.parse(sendWithRetries(encode(state, questions)));
+    }
+
+    /**
+     * Asynchronous variant of {@link #systemOne(Object, Map)}. The request and any retry
+     * backoff are non-blocking; no thread is held while waiting on the network.
+     */
+    public CompletableFuture<SystemOneResponse> systemOneAsync(Object state, Map<String, Question> questions) {
+        byte[] body = encode(state, questions);
+        return sendWithRetriesAsync(body, 0).thenApply(ResponseReader::parse);
+    }
+
+    private byte[] encode(Object state, Map<String, Question> questions) {
         Objects.requireNonNull(state, "state");
         Objects.requireNonNull(questions, "questions");
         if (questions.isEmpty()) {
             throw new IllegalArgumentException("At least one question is required.");
         }
-        byte[] body =
-                JsonWriter.write(RequestBuilder.build(model, state, questions)).getBytes(StandardCharsets.UTF_8);
-        return ResponseReader.parse(sendWithRetries(body));
+        return JsonWriter.write(RequestBuilder.build(model, state, questions)).getBytes(StandardCharsets.UTF_8);
     }
 
-    /** Asynchronous variant of {@link #systemOne(Object, Map)}. */
-    public CompletableFuture<SystemOneResponse> systemOneAsync(Object state, Map<String, Question> questions) {
-        return CompletableFuture.supplyAsync(() -> systemOne(state, questions));
+    private Map<String, String> headers() {
+        return Map.of("Authorization", "Bearer " + apiKey, "Content-Type", "application/json");
     }
 
     private String sendWithRetries(byte[] body) {
-        Map<String, String> headers = Map.of("Authorization", "Bearer " + apiKey, "Content-Type", "application/json");
         for (int attempt = 0; ; attempt++) {
-            HttpTransport.Response response = doSend(headers, body);
-            if (response.status() >= 200 && response.status() < 300) {
+            HttpTransport.Response response = doSend(headers(), body);
+            if (isSuccess(response)) {
                 return response.body();
             }
-            if (RETRYABLE.contains(response.status()) && attempt < maxRetries) {
-                backoff(attempt);
-                continue;
+            if (!shouldRetry(response, attempt)) {
+                throw errorFor(response.status(), response.body());
             }
-            throw errorFor(response.status(), response.body());
+            sleep(backoffMillis(attempt));
         }
+    }
+
+    private CompletableFuture<String> sendWithRetriesAsync(byte[] body, int attempt) {
+        return transport
+                .sendAsync(endpoint, headers(), body)
+                .exceptionallyCompose(e -> CompletableFuture.failedFuture(networkError(e)))
+                .thenCompose(response -> {
+                    if (isSuccess(response)) {
+                        return CompletableFuture.completedFuture(response.body());
+                    }
+                    if (!shouldRetry(response, attempt)) {
+                        return CompletableFuture.failedFuture(errorFor(response.status(), response.body()));
+                    }
+                    var delayed = CompletableFuture.delayedExecutor(backoffMillis(attempt), TimeUnit.MILLISECONDS);
+                    return CompletableFuture.supplyAsync(() -> attempt + 1, delayed)
+                            .thenCompose(next -> sendWithRetriesAsync(body, next));
+                });
+    }
+
+    private static boolean isSuccess(HttpTransport.Response response) {
+        return response.status() >= 200 && response.status() < 300;
+    }
+
+    private boolean shouldRetry(HttpTransport.Response response, int attempt) {
+        return RETRYABLE.contains(response.status()) && attempt < maxRetries;
+    }
+
+    private static JevException networkError(Throwable e) {
+        Throwable cause = e instanceof CompletionException && e.getCause() != null ? e.getCause() : e;
+        return cause instanceof JevException jev
+                ? jev
+                : new JevException("Network error calling Jev: " + cause.getMessage(), 0, null, cause);
     }
 
     private HttpTransport.Response doSend(Map<String, String> headers, byte[] body) {
@@ -96,13 +138,17 @@ public final class TypeSafeClient {
         }
     }
 
-    private static void backoff(int attempt) {
+    private static long backoffMillis(int attempt) {
         long base = (long) (500 * Math.pow(2, attempt));
-        long jitter = ThreadLocalRandom.current().nextLong(0, 250);
+        return base + ThreadLocalRandom.current().nextLong(0, 250);
+    }
+
+    private static void sleep(long millis) {
         try {
-            Thread.sleep(base + jitter);
+            Thread.sleep(millis);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            throw new JevException("Interrupted while waiting to retry Jev.", 0, null, e);
         }
     }
 

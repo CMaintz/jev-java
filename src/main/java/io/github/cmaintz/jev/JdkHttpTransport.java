@@ -7,6 +7,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 /** Default {@link HttpTransport} backed by {@code java.net.http.HttpClient}. */
 final class JdkHttpTransport implements HttpTransport {
@@ -22,11 +23,21 @@ final class JdkHttpTransport implements HttpTransport {
     @Override
     public Response send(String url, Map<String, String> headers, byte[] body)
             throws IOException, InterruptedException {
+        HttpResponse<String> response = client.send(request(url, headers, body), HttpResponse.BodyHandlers.ofString());
+        return new Response(response.statusCode(), response.body());
+    }
+
+    @Override
+    public CompletableFuture<Response> sendAsync(String url, Map<String, String> headers, byte[] body) {
+        return client.sendAsync(request(url, headers, body), HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> new Response(response.statusCode(), response.body()));
+    }
+
+    private HttpRequest request(String url, Map<String, String> headers, byte[] body) {
         var builder = HttpRequest.newBuilder(URI.create(url))
                 .timeout(timeout)
                 .POST(HttpRequest.BodyPublishers.ofByteArray(body));
         headers.forEach(builder::header);
-        HttpResponse<String> response = client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
-        return new Response(response.statusCode(), response.body());
+        return builder.build();
     }
 }
