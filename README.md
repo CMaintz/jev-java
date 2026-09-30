@@ -20,6 +20,19 @@ escalate only the low-confidence cases to a person or a larger model.
 Java 21 or newer. No runtime dependencies (built on `java.net.http` and a small
 internal JSON codec).
 
+## Installation
+
+Not yet published to Maven Central (see [Roadmap](#roadmap)), so there are no
+coordinates to add yet. Build from source and put the jar on your classpath:
+
+```bash
+git clone https://github.com/CMaintz/jev-java.git && cd jev-java
+./gradlew jar          # -> build/libs/jev-0.1.0.jar
+```
+
+or consume it as a Gradle composite build (`includeBuild("../jev-java")` in your
+`settings.gradle.kts`, then `implementation("io.github.cmaintz:jev:0.1.0")`).
+
 ## Quick start
 
 ```java
@@ -58,7 +71,8 @@ boolean wantsRefund = response.get("refund").noul() > 0.5;
 
 The three questions above are answered in a single request. Independent questions are
 evaluated in parallel, so batching them is close to free. For non-blocking calls, use
-`client.systemOneAsync(state, questions)`, which returns a `CompletableFuture`.
+`client.systemOneAsync(state, questions)`, which returns a `CompletableFuture`; it uses
+`HttpClient.sendAsync` and schedules retry backoff without holding a thread.
 
 ## The three primitives
 
@@ -92,7 +106,8 @@ All failures derive from `JevException`, which carries `statusCode()` and `respo
 | `JevOverloadedException` | 529 | service overloaded; retries exhausted |
 
 `429` and `529` are retried automatically with exponential backoff; `maxRetries` is
-configurable on the builder.
+configurable on the builder. If the calling thread is interrupted during backoff, the
+call stops and throws `JevException` with the interrupt flag restored.
 
 ## Configuration
 

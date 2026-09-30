@@ -9,9 +9,14 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - **v0.1:** `TypeSafeClient` for TypeSafe AI's Jev System One model. `systemOne(state, questions)` sends a state plus typed questions and returns typed answers with calibrated confidence; `systemOneAsync` returns a `CompletableFuture`.
 - Three question primitives as a sealed `Question` hierarchy: `Choice` (map criteria), `Score` (2 to 10 ordered levels), `Noul` (yes/no). Hand-written JSON codec so the `criteria` map/array and `probabilities` map/array shapes are handled exactly.
 - Confidence helper `Answer.isConfident(threshold)`; type-filtered views `SystemOneResponse.choices()` / `scores()` / `nouls()`.
-- Zero runtime dependencies (`java.net.http` plus an internal JSON reader/writer). API key from `TYPESAFE_API_KEY` or the builder; injectable `HttpTransport` seam for offline tests (20 tests).
+- Zero runtime dependencies (`java.net.http` plus an internal JSON reader/writer). API key from `TYPESAFE_API_KEY` or the builder; injectable `HttpTransport` seam for offline tests.
 - Automatic retry with exponential backoff on `429` / `529`; typed exceptions for `401` / `422` / `429` / `529`.
 - Foundry Java gate: Spotless format check, `compileJava`, JUnit 5 tests with an 80% jacoco floor, osv-scanner dependency audit.
+
+### Fixed
+
+- `systemOneAsync` no longer blocks a `ForkJoinPool.commonPool()` thread: it uses `HttpClient.sendAsync` and schedules retry backoff with a delayed executor. `HttpTransport` gains a default `sendAsync` (runs a blocking `send` on a virtual thread) for custom transports.
+- An interrupt during retry backoff now stops retrying and throws `JevException`, with the interrupt flag restored (it was swallowed and the retry continued).
 
 ### Roadmap
 
