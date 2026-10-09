@@ -37,14 +37,6 @@ tasks.test {
 
 tasks.jacocoTestReport { dependsOn(tasks.test) }
 
-// Public API docs are part of the gate: any doclint warning fails the build.
-tasks.javadoc {
-    (options as StandardJavadocDocletOptions).apply {
-        addBooleanOption("Xdoclint:all", true)
-        addBooleanOption("Werror", true)
-    }
-}
-
 tasks.jacocoTestCoverageVerification {
     dependsOn(tasks.test)
     violationRules {

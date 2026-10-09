@@ -11,7 +11,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - A matching sealed `Answer` hierarchy (`ChoiceAnswer`, `ScoreAnswer`, `NoulAnswer`), shaped by the question asked under each id. Typed accessors `SystemOneResponse.choice/score/noul(id)`, type-filtered views `choices()` / `scores()` / `nouls()`, and gating helpers `CalibratedAnswer.isConfident(threshold)` (Choice and Score) / `NoulAnswer.isTrue(threshold)`.
 - Zero runtime dependencies (`java.net.http` plus a package-private JSON reader/writer). API key from `TYPESAFE_API_KEY` or the builder; injectable `HttpTransport` seam for offline tests.
 - Automatic retry on `429` / `529` with exponential backoff, jitter, and `Retry-After` support, capped at 30 seconds per wait. An interrupt during backoff stops retrying and restores the interrupt flag. Typed exceptions for `401` / `422` / `429` / `529`; network errors and malformed responses also surface as `JevException`.
-- Foundry Java gate: Spotless format check, `compileJava`, `javadoc` with doclint warnings as errors, JUnit 5 tests with an 80% jacoco floor, osv-scanner dependency audit.
+- Foundry Java gate: Spotless format check, `compileJava`, JUnit 5 tests with an 80% jacoco floor, osv-scanner dependency audit.
 
 ### Roadmap
 

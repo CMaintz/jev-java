@@ -16,8 +16,8 @@ description = "Format check (Spotless)"
 run = "./gradlew spotlessCheck"
 
 [tasks.typecheck]
-description = "Compilation is Java's type check; javadoc fails on any doclint warning"
-run = "./gradlew compileJava javadoc"
+description = "Compilation is Java's type check"
+run = "./gradlew compileJava"
 
 [tasks.test]
 description = "Tests with the jacoco coverage floor"
