@@ -8,9 +8,11 @@ package io.github.cmaintz.jev;
  */
 public sealed interface Question permits Noul, Choice, Score {
 
-    /** Wire discriminator: {@code noul}, {@code choice}, or {@code score}. */
-    String type();
-
-    /** The judgment to make, in natural language. Backticked paths such as {@code ticket.body} reference nested state. */
+    /**
+     * The judgment to make, in natural language. Backticked paths such as
+     * {@code ticket.body} reference nested state.
+     *
+     * @return the instructions
+     */
     String instructions();
 }

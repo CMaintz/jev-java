@@ -13,17 +13,21 @@ import java.util.Objects;
  */
 public record Score(String instructions, List<String> criteria) implements Question {
 
+    /** The fewest levels a Score may have. */
+    public static final int MIN_LEVELS = 2;
+
+    /** The most levels a Score may have. */
+    public static final int MAX_LEVELS = 10;
+
     /** Validates and defensively copies the levels. */
     public Score {
+        Preconditions.requireText(instructions, "instructions");
         Objects.requireNonNull(criteria, "criteria");
-        if (criteria.size() < 2 || criteria.size() > 10) {
-            throw new IllegalArgumentException("A Score needs between 2 and 10 ordered levels.");
+        if (criteria.size() < MIN_LEVELS || criteria.size() > MAX_LEVELS) {
+            throw new IllegalArgumentException(
+                    "A Score needs between " + MIN_LEVELS + " and " + MAX_LEVELS + " ordered levels.");
         }
+        criteria.forEach(level -> Preconditions.requireText(level, "level description"));
         criteria = List.copyOf(criteria);
-    }
-
-    @Override
-    public String type() {
-        return "score";
     }
 }

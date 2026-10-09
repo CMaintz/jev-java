@@ -1,4 +1,4 @@
-package io.github.cmaintz.jev.json;
+package io.github.cmaintz.jev;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -8,9 +8,9 @@ import java.util.Map;
 /**
  * Minimal recursive-descent JSON parser. Returns a tree of {@link Map} (objects, key
  * order preserved), {@link List} (arrays), {@link String}, {@link Double} (all numbers),
- * {@link Boolean}, and {@code null}. Throws {@link JsonParseException} on malformed input.
+ * {@link Boolean}, and {@code null}. Throws {@link IllegalArgumentException} on malformed input.
  */
-public final class JsonParser {
+final class JsonParser {
 
     private final String text;
     private int pos;
@@ -20,7 +20,7 @@ public final class JsonParser {
     }
 
     /** Parse {@code json} into a tree of maps, lists, and scalars. */
-    public static Object parse(String json) {
+    static Object parse(String json) {
         var parser = new JsonParser(json);
         parser.skipWhitespace();
         Object value = parser.readValue();
@@ -201,7 +201,7 @@ public final class JsonParser {
         }
     }
 
-    private JsonParseException error(String message) {
-        return new JsonParseException(message + " at position " + pos);
+    private IllegalArgumentException error(String message) {
+        return new IllegalArgumentException("Malformed JSON: " + message + " at position " + pos);
     }
 }

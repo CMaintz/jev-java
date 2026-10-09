@@ -1,4 +1,4 @@
-package io.github.cmaintz.jev.json;
+package io.github.cmaintz.jev;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -28,30 +28,34 @@ class JsonTest {
     void parsesEscapesAndUnicode() {
         assertEquals("tab\there", JsonParser.parse("\"tab\\there\""));
         assertEquals("quote\"end", JsonParser.parse("\"quote\\\"end\""));
-        assertEquals("é", JsonParser.parse("\"\\u00e9\""));
+        assertEquals("\u00e9", JsonParser.parse("\"\\u00e9\""));
     }
 
     @Test
     void writerEscapesAndRoundTrips() {
         var map = new LinkedHashMap<String, Object>();
-        map.put("k", "line1\nline2\t\"q\"");
+        map.put("k", "line1\nline2\t\"q\"\u0001");
         map.put("n", 42);
         map.put("arr", List.of("x", "y"));
 
         var back = (Map<?, ?>) JsonParser.parse(JsonWriter.write(map));
-        assertEquals("line1\nline2\t\"q\"", back.get("k"));
+        assertEquals("line1\nline2\t\"q\"\u0001", back.get("k"));
         assertEquals(42.0, back.get("n"));
         assertEquals(2, ((List<?>) back.get("arr")).size());
     }
 
     @Test
-    void writerRejectsUnsupportedTypes() {
+    void writerRejectsUnsupportedTypesAndNonFiniteNumbers() {
         assertThrows(IllegalArgumentException.class, () -> JsonWriter.write(new Object()));
+        assertThrows(IllegalArgumentException.class, () -> JsonWriter.write(Double.NaN));
+        assertThrows(IllegalArgumentException.class, () -> JsonWriter.write(Float.POSITIVE_INFINITY));
     }
 
     @Test
     void parserRejectsMalformedInput() {
-        assertThrows(JsonParseException.class, () -> JsonParser.parse("{\"a\":}"));
-        assertThrows(JsonParseException.class, () -> JsonParser.parse("[1,2"));
+        assertThrows(IllegalArgumentException.class, () -> JsonParser.parse("{\"a\":}"));
+        assertThrows(IllegalArgumentException.class, () -> JsonParser.parse("[1,2"));
+        assertThrows(IllegalArgumentException.class, () -> JsonParser.parse("{} x"));
+        assertThrows(IllegalArgumentException.class, () -> JsonParser.parse("\"\\q\""));
     }
 }
