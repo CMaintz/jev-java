@@ -11,13 +11,17 @@ package io.github.cmaintz.jev;
  */
 public record Noul(String instructions, String whenTrue, String whenFalse) implements Question {
 
-    /** A bare yes/no judgment with no glosses. */
-    public Noul(String instructions) {
-        this(instructions, null, null);
+    /** Validates the instructions. */
+    public Noul {
+        Preconditions.requireText(instructions, "instructions");
     }
 
-    @Override
-    public String type() {
-        return "noul";
+    /**
+     * A bare yes/no judgment with no glosses.
+     *
+     * @param instructions the condition to judge
+     */
+    public Noul(String instructions) {
+        this(instructions, null, null);
     }
 }

@@ -1,4 +1,4 @@
-package io.github.cmaintz.jev.json;
+package io.github.cmaintz.jev;
 
 import java.util.Map;
 
@@ -7,14 +7,18 @@ import java.util.Map;
  * (object), {@code Iterable} (array), {@code String}, {@code Number}, {@code Boolean},
  * and {@code null}. State passed to the client must be composed of these.
  */
-public final class JsonWriter {
+final class JsonWriter {
 
     private final StringBuilder sb = new StringBuilder();
 
     private JsonWriter() {}
 
-    /** Serialize {@code value} to a JSON string. */
-    public static String write(Object value) {
+    /**
+     * Serialize {@code value} to a JSON string.
+     *
+     * @throws IllegalArgumentException on an unsupported type or a non-finite number
+     */
+    static String write(Object value) {
         var writer = new JsonWriter();
         writer.writeValue(value);
         return writer.sb.toString();
@@ -25,12 +29,19 @@ public final class JsonWriter {
             case null -> sb.append("null");
             case String s -> writeString(s);
             case Boolean b -> sb.append(b.booleanValue());
-            case Number n -> sb.append(n);
+            case Number n -> writeNumber(n);
             case Map<?, ?> m -> writeObject(m);
             case Iterable<?> it -> writeArray(it);
             default -> throw new IllegalArgumentException(
                     "Unsupported JSON value type: " + value.getClass().getName());
         }
+    }
+
+    private void writeNumber(Number n) {
+        if ((n instanceof Double d && !Double.isFinite(d)) || (n instanceof Float f && !Float.isFinite(f))) {
+            throw new IllegalArgumentException("JSON cannot represent the number " + n);
+        }
+        sb.append(n);
     }
 
     private void writeObject(Map<?, ?> map) {

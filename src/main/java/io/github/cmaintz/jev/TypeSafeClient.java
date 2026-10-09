@@ -1,16 +1,10 @@
 package io.github.cmaintz.jev;
 
-import io.github.cmaintz.jev.json.JsonWriter;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import java.net.URI;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
 
 /**
  * A client for TypeSafe AI's Jev "System One" model. Send a {@code state} plus a set of
@@ -21,32 +15,68 @@ import java.util.concurrent.TimeUnit;
 public final class TypeSafeClient {
 
     private static final String ENV_KEY = "TYPESAFE_API_KEY";
-    private static final Set<Integer> RETRYABLE = Set.of(429, 529);
+    private static final String PATH = "/v1/systemone";
 
-    private final HttpTransport transport;
-    private final String apiKey;
-    private final String endpoint;
     private final String model;
-    private final int maxRetries;
+    private final RetryingSender sender;
 
     private TypeSafeClient(Builder builder) {
-        String key = builder.apiKey != null ? builder.apiKey : System.getenv(ENV_KEY);
+        this.model = builder.model;
+        this.sender = new RetryingSender(
+                builder.transport != null ? builder.transport : new JdkHttpTransport(builder.timeout),
+                endpoint(builder.baseUrl),
+                Map.of("Authorization", "Bearer " + resolveApiKey(builder.apiKey), "Content-Type", "application/json"),
+                builder.maxRetries,
+                builder.delays);
+    }
+
+    private static String endpoint(String baseUrl) {
+        String url = baseUrl.replaceAll("/+$", "") + PATH;
+        if (!isHttpUrl(url)) {
+            throw new IllegalArgumentException(
+                    "baseUrl must be an absolute http(s) URL without a query or fragment: " + baseUrl);
+        }
+        return url;
+    }
+
+    private static boolean isHttpUrl(String url) {
+        try {
+            URI uri = URI.create(url);
+            String scheme = uri.getScheme();
+            boolean http = "https".equalsIgnoreCase(scheme) || "http".equalsIgnoreCase(scheme);
+            return http && uri.getHost() != null && uri.getRawQuery() == null && uri.getRawFragment() == null;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    private static String resolveApiKey(String configured) {
+        String key = configured != null ? configured : System.getenv(ENV_KEY);
         if (key == null || key.isBlank()) {
             throw new JevException("No API key. Set " + ENV_KEY + " or Builder.apiKey.", 0, null, null);
         }
-        this.apiKey = key;
-        this.model = builder.model;
-        this.maxRetries = Math.max(0, builder.maxRetries);
-        this.endpoint = builder.baseUrl.replaceAll("/+$", "") + "/v1/systemone";
-        this.transport = builder.transport != null ? builder.transport : new JdkHttpTransport(builder.timeout);
+        key = key.strip();
+        if (key.chars().anyMatch(c -> c < 0x21 || c > 0x7e)) {
+            throw new JevException("The API key may only contain printable ASCII characters.", 0, null, null);
+        }
+        return key;
     }
 
-    /** A new builder with default settings. */
+    /**
+     * A new builder with default settings.
+     *
+     * @return a fresh builder
+     */
     public static Builder builder() {
         return new Builder();
     }
 
-    /** A client that reads its key from {@code TYPESAFE_API_KEY}. */
+    /**
+     * A client with default settings that reads its key from {@code TYPESAFE_API_KEY}.
+     *
+     * @return the client
+     * @throws JevException if the variable is unset or blank
+     */
     public static TypeSafeClient fromEnvironment() {
         return builder().build();
     }
@@ -55,18 +85,30 @@ public final class TypeSafeClient {
      * Evaluate {@code questions} against {@code state}. State may be a String, or any
      * tree of Map/List/String/Number/Boolean/null (a {@code Map} gives exact control
      * over field names). Answers come back keyed by the same ids.
+     *
+     * @param state the input to judge
+     * @param questions the questions to ask, keyed by an id of your choosing
+     * @return the typed answers, keyed by question id
+     * @throws IllegalArgumentException if there are no questions or the state holds an unsupported type
+     * @throws JevException on any network, HTTP, or response-format failure
      */
     public SystemOneResponse systemOne(Object state, Map<String, Question> questions) {
-        return ResponseReader.parse(sendWithRetries(encode(state, questions)));
+        String body = sender.send(encode(state, questions));
+        return ResponseDecoder.decode(body, questions);
     }
 
     /**
      * Asynchronous variant of {@link #systemOne(Object, Map)}. The request and any retry
      * backoff are non-blocking; no thread is held while waiting on the network.
+     *
+     * @param state the input to judge
+     * @param questions the questions to ask, keyed by an id of your choosing
+     * @return a future completing with the typed answers, or exceptionally with the
+     *     {@link JevException} that {@link #systemOne(Object, Map)} would throw
+     * @throws IllegalArgumentException immediately, for the same invalid arguments as the blocking call
      */
     public CompletableFuture<SystemOneResponse> systemOneAsync(Object state, Map<String, Question> questions) {
-        byte[] body = encode(state, questions);
-        return sendWithRetriesAsync(body, 0).thenApply(ResponseReader::parse);
+        return sender.sendAsync(encode(state, questions)).thenApply(body -> ResponseDecoder.decode(body, questions));
     }
 
     private byte[] encode(Object state, Map<String, Question> questions) {
@@ -75,92 +117,7 @@ public final class TypeSafeClient {
         if (questions.isEmpty()) {
             throw new IllegalArgumentException("At least one question is required.");
         }
-        return JsonWriter.write(RequestBuilder.build(model, state, questions)).getBytes(StandardCharsets.UTF_8);
-    }
-
-    private Map<String, String> headers() {
-        return Map.of("Authorization", "Bearer " + apiKey, "Content-Type", "application/json");
-    }
-
-    private String sendWithRetries(byte[] body) {
-        for (int attempt = 0; ; attempt++) {
-            HttpTransport.Response response = doSend(headers(), body);
-            if (isSuccess(response)) {
-                return response.body();
-            }
-            if (!shouldRetry(response, attempt)) {
-                throw errorFor(response.status(), response.body());
-            }
-            sleep(backoffMillis(attempt));
-        }
-    }
-
-    private CompletableFuture<String> sendWithRetriesAsync(byte[] body, int attempt) {
-        return transport
-                .sendAsync(endpoint, headers(), body)
-                .exceptionallyCompose(e -> CompletableFuture.failedFuture(networkError(e)))
-                .thenCompose(response -> {
-                    if (isSuccess(response)) {
-                        return CompletableFuture.completedFuture(response.body());
-                    }
-                    if (!shouldRetry(response, attempt)) {
-                        return CompletableFuture.failedFuture(errorFor(response.status(), response.body()));
-                    }
-                    var delayed = CompletableFuture.delayedExecutor(backoffMillis(attempt), TimeUnit.MILLISECONDS);
-                    return CompletableFuture.supplyAsync(() -> attempt + 1, delayed)
-                            .thenCompose(next -> sendWithRetriesAsync(body, next));
-                });
-    }
-
-    private static boolean isSuccess(HttpTransport.Response response) {
-        return response.status() >= 200 && response.status() < 300;
-    }
-
-    private boolean shouldRetry(HttpTransport.Response response, int attempt) {
-        return RETRYABLE.contains(response.status()) && attempt < maxRetries;
-    }
-
-    private static JevException networkError(Throwable e) {
-        Throwable cause = e instanceof CompletionException && e.getCause() != null ? e.getCause() : e;
-        return cause instanceof JevException jev
-                ? jev
-                : new JevException("Network error calling Jev: " + cause.getMessage(), 0, null, cause);
-    }
-
-    private HttpTransport.Response doSend(Map<String, String> headers, byte[] body) {
-        try {
-            return transport.send(endpoint, headers, body);
-        } catch (IOException e) {
-            throw new JevException("Network error calling Jev: " + e.getMessage(), 0, null, e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new JevException("Interrupted while calling Jev.", 0, null, e);
-        }
-    }
-
-    private static long backoffMillis(int attempt) {
-        long base = (long) (500 * Math.pow(2, attempt));
-        return base + ThreadLocalRandom.current().nextLong(0, 250);
-    }
-
-    private static void sleep(long millis) {
-        try {
-            Thread.sleep(millis);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new JevException("Interrupted while waiting to retry Jev.", 0, null, e);
-        }
-    }
-
-    private static JevException errorFor(int status, String body) {
-        return switch (status) {
-            case 401 -> new JevAuthException("Unauthorized: invalid or missing API key.", body);
-            case 422 -> new JevValidationException(
-                    "Unprocessable entity: the request was rejected as malformed.", body);
-            case 429 -> new JevRateLimitException("Rate limit exceeded; retries exhausted.", body);
-            case 529 -> new JevOverloadedException("Service overloaded; retries exhausted.", body);
-            default -> new JevException("Unexpected HTTP " + status + " from Jev.", status, body, null);
-        };
+        return RequestEncoder.encode(model, state, questions);
     }
 
     /** Fluent builder for {@link TypeSafeClient}. */
@@ -172,46 +129,96 @@ public final class TypeSafeClient {
         private Duration timeout = Duration.ofSeconds(60);
         private int maxRetries = 3;
         private HttpTransport transport;
+        private RetryingSender.Delays delays = RetryingSender.REAL_DELAYS;
 
         private Builder() {}
 
-        /** API key. If unset, {@code TYPESAFE_API_KEY} is used. */
+        /**
+         * API key. If unset, {@code TYPESAFE_API_KEY} is used.
+         *
+         * @param value the key; surrounding whitespace is stripped
+         * @return this builder
+         */
         public Builder apiKey(String value) {
-            this.apiKey = value;
+            this.apiKey = Preconditions.requireText(value, "apiKey");
             return this;
         }
 
-        /** Service base address; {@code /v1/systemone} is appended. */
+        /**
+         * Service base address; {@code /v1/systemone} is appended to it.
+         *
+         * @param value an absolute http(s) URL without a query or fragment, e.g. a proxy
+         * @return this builder
+         */
         public Builder baseUrl(String value) {
-            this.baseUrl = value;
+            this.baseUrl = Preconditions.requireText(value, "baseUrl");
             return this;
         }
 
-        /** Model id; defaults to {@code jev-latest}. */
+        /**
+         * Model id; defaults to {@code jev-latest}.
+         *
+         * @param value the model
+         * @return this builder
+         */
         public Builder model(String value) {
-            this.model = value;
+            this.model = Preconditions.requireText(value, "model");
             return this;
         }
 
-        /** Per-request timeout for the default transport. */
+        /**
+         * Per-request and connect timeout for the default transport.
+         *
+         * @param value a positive duration
+         * @return this builder
+         */
         public Builder timeout(Duration value) {
+            Objects.requireNonNull(value, "timeout");
+            if (value.isNegative() || value.isZero()) {
+                throw new IllegalArgumentException("timeout must be positive.");
+            }
             this.timeout = value;
             return this;
         }
 
-        /** Maximum retries after a 429 or 529 before giving up. */
+        /**
+         * Maximum retries after a 429 or 529 before giving up; zero disables retrying.
+         *
+         * @param value a non-negative count
+         * @return this builder
+         */
         public Builder maxRetries(int value) {
+            if (value < 0) {
+                throw new IllegalArgumentException("maxRetries must not be negative.");
+            }
             this.maxRetries = value;
             return this;
         }
 
-        /** Inject a transport (e.g. a stub for offline tests). */
+        /**
+         * Inject a transport (e.g. a stub for offline tests).
+         *
+         * @param value the transport
+         * @return this builder
+         */
         public Builder transport(HttpTransport value) {
-            this.transport = value;
+            this.transport = Objects.requireNonNull(value, "transport");
             return this;
         }
 
-        /** Build the client. */
+        /** Test seam: replaces the real waits between retries. */
+        Builder delays(RetryingSender.Delays value) {
+            this.delays = Objects.requireNonNull(value, "delays");
+            return this;
+        }
+
+        /**
+         * Build the client.
+         *
+         * @return the client
+         * @throws IllegalArgumentException if the base URL is not an absolute http(s) URL, or has a query or fragment
+         * @throws JevException if no usable API key is configured or found in the environment
+         */
         public TypeSafeClient build() {
             return new TypeSafeClient(this);
         }

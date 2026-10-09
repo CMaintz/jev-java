@@ -58,15 +58,15 @@ SystemOneResponse response = client.systemOne(
     Map.of("subject", "Charged twice!", "body", "I want my money back."),
     questions);
 
-Answer team = response.get("team");
+ChoiceAnswer team = response.choice("team");
 if (team.isConfident(0.7)) {
     route(team.choice());            // "billing"
 } else {
     escalateToHuman();               // distribution was spread out
 }
 
-double anger = response.get("anger").score();          // e.g. 1.8
-boolean wantsRefund = response.get("refund").noul() > 0.5;
+double anger = response.score("anger").score();          // e.g. 1.8
+boolean wantsRefund = response.noul("refund").isTrue(0.5);
 ```
 
 The three questions above are answered in a single request. Independent questions are
@@ -76,27 +76,52 @@ evaluated in parallel, so batching them is close to free. For non-blocking calls
 
 ## The three primitives
 
-| Type | Ask when | Answer fields |
-| --- | --- | --- |
-| `Choice` | one of a defined set | `choice()`, `probabilities()` (per option), `confidence()` |
-| `Score` | a position on an ordered scale | `score()`, `scoreProbabilities()` (per level), `legend()`, `confidence()` |
-| `Noul` | a yes/no condition | `noul()` (0..1); no confidence |
+| Question | Ask when | Answer | Answer fields |
+| --- | --- | --- | --- |
+| `Choice` | one of a defined set | `ChoiceAnswer` | `choice()`, `probabilities()` (per option), `confidence()` |
+| `Score` | a position on an ordered scale | `ScoreAnswer` | `score()`, `probabilities()` (per level), `legend()`, `confidence()` |
+| `Noul` | a yes/no condition | `NoulAnswer` | `probability()` (0..1); no confidence |
 
-`Choice` criteria is a map of option to description (max 255 options). `Score` criteria
+Each answer mirrors the question asked under its id. Fetch it with the typed accessors
+`response.choice(id)` / `score(id)` / `noul(id)`, or switch over the sealed `Answer`
+returned by `response.get(id)`:
+
+```java
+switch (response.get(id)) {
+    case ChoiceAnswer c -> ...
+    case ScoreAnswer s -> ...
+    case NoulAnswer n -> ...
+}
+```
+
+`Choice` criteria is a map of option to description (1 to 255 options). `Score` criteria
 is an ordered list of 2 to 10 level descriptions, low to high. The model cannot pick an
 option you did not give it, so include a no-match option when nothing may fit.
 
 ## Confidence
 
-`Choice` and `Score` answers carry a `confidence()` in `[0, 1]` derived from how peaked
-the probability distribution is. `Answer.isConfident(threshold)` is a convenience for
-gating. A `Noul` has no confidence; gate it on the probability itself (near 0.5 means
-genuinely uncertain, not "medium yes"). A confidence threshold is not one number: use a
+`ChoiceAnswer` and `ScoreAnswer` are both `CalibratedAnswer`s. They carry a
+`confidence()` in `[0, 1]` derived from how peaked the probability distribution is, and
+`isConfident(threshold)` gates either kind:
+
+```java
+if (answer instanceof CalibratedAnswer c && c.isConfident(0.7)) { ... }
+```
+
+`isConfident` is false when the service omitted the confidence (`NaN`). A `Noul` has no
+confidence, so gate it on the probability itself with `NoulAnswer.isTrue(threshold)`;
+near 0.5 means genuinely uncertain, not "medium yes". Both helpers pass at or above the
+threshold. A confidence threshold is not one number: use a
 stricter bar for consequential actions than for harmless ones, and tune it on your data.
 
 ## Errors
 
-All failures derive from `JevException`, which carries `statusCode()` and `responseBody()`:
+All service failures derive from `JevException`, which carries `statusCode()` and
+`responseBody()`. A network error, an interruption, or a malformed response body also
+surfaces as a `JevException` (status `0`), as does a missing API key at `build()`.
+Invalid arguments, such as an empty question map, an unsupported state type, or a
+base URL that is not an absolute http(s) URL, throw `IllegalArgumentException`
+before any request is sent.
 
 | Exception | HTTP | Meaning |
 | --- | --- | --- |
@@ -105,9 +130,11 @@ All failures derive from `JevException`, which carries `statusCode()` and `respo
 | `JevRateLimitException` | 429 | rate limited; retries exhausted |
 | `JevOverloadedException` | 529 | service overloaded; retries exhausted |
 
-`429` and `529` are retried automatically with exponential backoff; `maxRetries` is
-configurable on the builder. If the calling thread is interrupted during backoff, the
-call stops and throws `JevException` with the interrupt flag restored.
+`429` and `529` are retried automatically with exponential backoff and jitter, honoring
+a `Retry-After` header given in seconds; each wait is capped at 30 seconds.
+`maxRetries` is configurable on the builder. If the calling thread is interrupted
+during backoff, the call stops and throws `JevException` with the interrupt flag
+restored.
 
 ## Configuration
 
