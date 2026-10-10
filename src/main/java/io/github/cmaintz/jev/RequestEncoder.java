@@ -27,7 +27,8 @@ final class RequestEncoder {
         return out;
     }
 
-    private static Map<String, Object> questionMap(Question question) {
+    /** One question as it goes on the wire; also what jev-eval records as its definition. */
+    static Map<String, Object> questionMap(Question question) {
         var map = new LinkedHashMap<String, Object>();
         map.put("type", wireType(question));
         map.put("instructions", question.instructions());
