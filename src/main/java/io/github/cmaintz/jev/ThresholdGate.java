@@ -44,35 +44,30 @@ public record ThresholdGate(
      * The row confidence: the lowest confidence among the answers to {@link #questionIds()}.
      *
      * @param response the answers to the questions this gate was picked for
-     * @return the minimum confidence, or NaN if any of them is NaN
-     * @throws java.util.NoSuchElementException if a gated question has no answer
-     * @throws IllegalStateException if a gated answer is not a Choice or Score answer
+     * @return the minimum confidence, or NaN if a gated question has no answer, is not a
+     *     Choice or Score answer, or has a NaN confidence
      */
     public double rowConfidence(SystemOneResponse response) {
         double min = Double.POSITIVE_INFINITY;
         for (String id : questionIds) {
-            min = Math.min(min, calibrated(response, id).confidence());
+            min = Math.min(min, confidence(response, id));
         }
         return min;
     }
 
     /**
      * True when the row falls below the gate and should go to a person or a bigger model.
-     * A missing (NaN) confidence escalates.
+     * Fails toward review: a missing answer, an answer without a confidence, or a NaN
+     * confidence escalates rather than throwing.
      *
      * @param response the answers to the questions this gate was picked for
-     * @return whether to escalate; throws like {@link #rowConfidence(SystemOneResponse)}
+     * @return whether to escalate
      */
     public boolean shouldEscalate(SystemOneResponse response) {
         return !(rowConfidence(response) >= threshold);
     }
 
-    private static CalibratedAnswer calibrated(SystemOneResponse response, String id) {
-        Answer answer = response.get(id);
-        if (answer instanceof CalibratedAnswer calibrated) {
-            return calibrated;
-        }
-        throw new IllegalStateException(
-                "Answer '" + id + "' is a " + answer.getClass().getSimpleName() + ", which carries no confidence.");
+    private static double confidence(SystemOneResponse response, String id) {
+        return response.answers().get(id) instanceof CalibratedAnswer calibrated ? calibrated.confidence() : Double.NaN;
     }
 }

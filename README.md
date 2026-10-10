@@ -138,6 +138,10 @@ A file that is not version 1, or that has no gate for your questions, throws
 `IllegalArgumentException` with the reason. Warnings never throw: they are returned on
 `gate.warnings()` for you to log.
 
+`shouldEscalate` fails toward review: a missing answer, an answer that is not a
+Choice/Score, or a NaN confidence escalates instead of throwing (`rowConfidence` returns
+NaN in those cases).
+
 ## Errors
 
 All service failures derive from `JevException`, which carries `statusCode()` and

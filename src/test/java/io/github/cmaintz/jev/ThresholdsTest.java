@@ -11,7 +11,6 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import org.junit.jupiter.api.Test;
 
 class ThresholdsTest {
@@ -114,13 +113,14 @@ class ThresholdsTest {
     }
 
     @Test
-    void escalationNeedsAConfidenceForEveryGatedQuestion() throws Exception {
+    void escalatesInsteadOfThrowingWhenAGatedConfidenceIsMissing() throws Exception {
         ThresholdGate gate = fixture().pick(questions("team", TEAM));
         var noulOnly = new SystemOneResponse("jev-latest", Map.of("team", new NoulAnswer(0.9)), null);
         var empty = new SystemOneResponse("jev-latest", Map.of(), null);
 
-        assertThrows(IllegalStateException.class, () -> gate.shouldEscalate(noulOnly));
-        assertThrows(NoSuchElementException.class, () -> gate.shouldEscalate(empty));
+        assertTrue(gate.shouldEscalate(noulOnly));
+        assertTrue(gate.shouldEscalate(empty));
+        assertTrue(Double.isNaN(gate.rowConfidence(empty)));
     }
 
     @Test
