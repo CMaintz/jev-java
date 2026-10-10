@@ -114,6 +114,30 @@ near 0.5 means genuinely uncertain, not "medium yes". Both helpers pass at or ab
 threshold. A confidence threshold is not one number: use a
 stricter bar for consequential actions than for harmless ones, and tune it on your data.
 
+### Measured thresholds from jev-eval
+
+Rather than guessing a threshold, measure one on labeled data with
+[jev-eval](https://github.com/CMaintz/jev-eval) and load its `thresholds.json`
+(contract version 1). `pick` returns the gate for the questions you send: a single
+Choice/Score question gets its own gate; several get the row-level `composite` gate,
+which must have been measured over exactly those questions. Nouls are ignored.
+
+```java
+ThresholdGate gate = JevThresholds.load(Path.of("thresholds.json"))
+    .pick(questions, "jev-latest");     // model is optional; null skips the check
+gate.warnings().forEach(log::warn);    // model changed, or a question was reworded
+log.info("gate {} ({} accurate at {} coverage, n={}, model {})",
+    gate.threshold(), gate.accuracy(), gate.coverage(), gate.n(), gate.model());
+
+if (gate.shouldEscalate(response)) {   // lowest Choice/Score confidence < threshold
+    escalateToHuman();
+}
+```
+
+A file that is not version 1, or that has no gate for your questions, throws
+`IllegalArgumentException` with the reason. Warnings never throw: they are returned on
+`gate.warnings()` for you to log.
+
 ## Errors
 
 All service failures derive from `JevException`, which carries `statusCode()` and

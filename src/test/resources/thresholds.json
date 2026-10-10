@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "model": "jev-latest",
+  "generatedAt": "2026-10-10T12:00:00Z",
+  "guard": {"method": "bootstrap", "resamples": 1000, "seed": 0},
+  "tolerance": 0,
+  "questions": {
+    "team": {"type": "choice", "threshold": 0.8, "accuracy": 0.94, "coverage": 0.61, "n": 300},
+    "sentiment": {"type": "score", "threshold": 0.7, "accuracy": 0.91, "coverage": 0.66, "n": 300},
+    "urgent": {"type": "noul", "threshold": 0.6, "accuracy": 0.95, "coverage": 0.5, "n": 300}
+  },
+  "composite": {"threshold": 0.82, "accuracy": 0.93, "coverage": 0.55, "n": 300, "questions": ["sentiment", "team"]},
+  "definitions": {
+    "team": {"type": "choice", "instructions": "Which team?", "criteria": {"billing": "Billing", "tech": "Tech"}},
+    "sentiment": {"type": "score", "instructions": "sentiment", "criteria": ["negative", "neutral", "positive"]},
+    "urgent": {"type": "noul", "instructions": "Is it urgent?"}
+  }
+}
