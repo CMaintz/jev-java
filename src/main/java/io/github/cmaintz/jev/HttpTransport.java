@@ -8,7 +8,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * The HTTP seam behind {@link TypeSafeClient}. The default implementation wraps the JDK
+ * The HTTP seam behind {@link JevClient}. The default implementation wraps the JDK
  * HTTP client; tests inject a stub so they never touch the network. This interface
  * exists because {@code java.net.http.HttpClient} is final and cannot be mocked.
  */

@@ -1,6 +1,6 @@
 package io.github.cmaintz.jev;
 
-/** Base type for every error surfaced by {@link TypeSafeClient}. */
+/** Base type for every error this SDK surfaces, from {@link JevClient} or {@link JevThresholds}. */
 public class JevException extends RuntimeException {
 
     private static final long serialVersionUID = 1L;

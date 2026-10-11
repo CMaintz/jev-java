@@ -12,7 +12,7 @@ import java.util.concurrent.CompletableFuture;
  * Independent questions are evaluated in parallel, so batching them into one call is
  * close to free. Instances are thread-safe; build one and reuse it.
  */
-public final class TypeSafeClient {
+public final class JevClient {
 
     private static final String ENV_KEY = "TYPESAFE_API_KEY";
     private static final String PATH = "/v1/systemone";
@@ -20,7 +20,7 @@ public final class TypeSafeClient {
     private final String model;
     private final RetryingSender sender;
 
-    private TypeSafeClient(Builder builder) {
+    private JevClient(Builder builder) {
         this.model = builder.model;
         this.sender = new RetryingSender(
                 builder.transport != null ? builder.transport : new JdkHttpTransport(builder.timeout),
@@ -77,7 +77,7 @@ public final class TypeSafeClient {
      * @return the client
      * @throws JevException if the variable is unset or blank
      */
-    public static TypeSafeClient fromEnvironment() {
+    public static JevClient fromEnvironment() {
         return builder().build();
     }
 
@@ -120,7 +120,7 @@ public final class TypeSafeClient {
         return RequestEncoder.encode(model, state, questions);
     }
 
-    /** Fluent builder for {@link TypeSafeClient}. */
+    /** Fluent builder for {@link JevClient}. */
     public static final class Builder {
 
         private String apiKey;
@@ -219,8 +219,8 @@ public final class TypeSafeClient {
          * @throws IllegalArgumentException if the base URL is not an absolute http(s) URL, or has a query or fragment
          * @throws JevException if no usable API key is configured or found in the environment
          */
-        public TypeSafeClient build() {
-            return new TypeSafeClient(this);
+        public JevClient build() {
+            return new JevClient(this);
         }
     }
 }

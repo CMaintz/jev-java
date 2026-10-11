@@ -12,8 +12,12 @@ import java.util.Map;
  */
 final class JsonParser {
 
+    /** Deepest nesting accepted, as System.Text.Json's default; deeper input would overflow the stack. */
+    private static final int MAX_DEPTH = 64;
+
     private final String text;
     private int pos;
+    private int depth;
 
     private JsonParser(String text) {
         this.text = text;
@@ -34,13 +38,22 @@ final class JsonParser {
     private Object readValue() {
         char c = peek();
         return switch (c) {
-            case '{' -> readObject();
-            case '[' -> readArray();
+            case '{' -> nested(this::readObject);
+            case '[' -> nested(this::readArray);
             case '"' -> readString();
             case 't', 'f' -> readBoolean();
             case 'n' -> readNull();
             default -> readNumber();
         };
+    }
+
+    private Object nested(java.util.function.Supplier<Object> reader) {
+        if (++depth > MAX_DEPTH) {
+            throw error("nesting deeper than " + MAX_DEPTH);
+        }
+        Object value = reader.get();
+        depth--;
+        return value;
     }
 
     private Map<String, Object> readObject() {

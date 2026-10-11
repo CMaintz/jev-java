@@ -42,8 +42,8 @@ final class StubTransport implements HttpTransport {
     }
 
     /** A client on this transport whose retry waits are recorded instead of taken. */
-    TypeSafeClient client(int maxRetries) {
-        return TypeSafeClient.builder()
+    JevClient client(int maxRetries) {
+        return JevClient.builder()
                 .apiKey("test-key")
                 .transport(this)
                 .maxRetries(maxRetries)

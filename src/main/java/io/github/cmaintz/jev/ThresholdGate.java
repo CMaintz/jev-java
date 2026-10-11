@@ -1,6 +1,7 @@
 package io.github.cmaintz.jev;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 /**
@@ -8,7 +9,7 @@ import java.util.Objects;
  * questions, with what jev-eval measured it buys. A row is covered (decided automatically)
  * when its confidence is at or above {@link #threshold()}; below it, escalate. Row
  * confidence is the lowest Choice/Score confidence across {@link #questionIds()}; Nouls
- * never take part. Log the measured fields as provenance.
+ * never take part. Log {@link #describe()} and {@link #warnings()} next to your results.
  *
  * @param threshold the confidence cut-point
  * @param accuracy accuracy jev-eval measured on covered unseen rows, in [0, 1]
@@ -65,6 +66,24 @@ public record ThresholdGate(
      */
     public boolean shouldEscalate(SystemOneResponse response) {
         return !(rowConfidence(response) >= threshold);
+    }
+
+    /**
+     * One line naming the gate, where it came from and what jev-eval measured, for logs.
+     *
+     * @return e.g. {@code gate 0.82 from "team" (jev-eval: 97.5% accuracy at 64.0% coverage, n=400, model jev-latest)}
+     */
+    public String describe() {
+        String from = COMPOSITE.equals(source) ? COMPOSITE : "\"" + source + "\"";
+        return String.format(
+                Locale.ROOT,
+                "gate %s from %s (jev-eval: %.1f%% accuracy at %.1f%% coverage, n=%d, model %s)",
+                java.math.BigDecimal.valueOf(threshold).stripTrailingZeros().toPlainString(),
+                from,
+                accuracy * 100,
+                coverage * 100,
+                n,
+                model);
     }
 
     private static double confidence(SystemOneResponse response, String id) {
