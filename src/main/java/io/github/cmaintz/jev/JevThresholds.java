@@ -17,7 +17,7 @@ import java.util.Optional;
  * (contract version 1): confidence gates measured on labeled data. Load it once, then
  * {@link #pick(Map, String)} the gate for the questions you send. Unknown keys are ignored.
  * A malformed file, or questions the file was not measured for, throw
- * {@link IllegalArgumentException}.
+ * {@link JevThresholdsException}.
  *
  * <pre>{@code
  * ThresholdGate gate = JevThresholds.load(Path.of("thresholds.json")).pick(questions, "jev-latest");
@@ -43,7 +43,8 @@ public final class JevThresholds {
         Map<?, ?> compositeEntry = optionalObject(root, "composite");
         this.composite = compositeEntry == null ? null : Gate.parse(compositeEntry, "\"composite\"");
         this.compositeQuestions = compositeEntry == null ? List.of() : sortedStrings(compositeEntry.get("questions"));
-        this.definitions = optionalObject(root, "definitions");
+        // Definitions only feed the reworded-question warning, so an unusable block is ignored.
+        this.definitions = root.get("definitions") instanceof Map<?, ?> m ? m : null;
     }
 
     /**
@@ -51,11 +52,11 @@ public final class JevThresholds {
      *
      * @param json the file contents
      * @return the parsed thresholds
-     * @throws IllegalArgumentException if it is not valid JSON or not a version 1 thresholds file
+     * @throws JevThresholdsException if it is not valid JSON or not a version 1 thresholds file
      */
     public static JevThresholds parse(String json) {
         Objects.requireNonNull(json, "json");
-        if (!(JsonParser.parse(json) instanceof Map<?, ?> root)) {
+        if (!(parseJson(json) instanceof Map<?, ?> root)) {
             throw malformed("expected a JSON object");
         }
         if (!(root.get("version") instanceof Double version) || version != 1.0) {
@@ -70,7 +71,7 @@ public final class JevThresholds {
      * @param path the file
      * @return the parsed thresholds
      * @throws IOException if the file cannot be read
-     * @throws IllegalArgumentException if it is not a version 1 thresholds file
+     * @throws JevThresholdsException if it is not a version 1 thresholds file
      */
     public static JevThresholds load(Path path) throws IOException {
         return parse(Files.readString(path, StandardCharsets.UTF_8));
@@ -90,6 +91,7 @@ public final class JevThresholds {
      *
      * @param questions the questions you send, keyed by id
      * @return the gate with its measured provenance
+     * @throws JevThresholdsException if the file has no gate for these questions
      */
     public ThresholdGate pick(Map<String, Question> questions) {
         return pick(questions, null);
@@ -104,14 +106,14 @@ public final class JevThresholds {
      * @param questions the questions you send, keyed by id
      * @param model the model you call, or null to skip the model check
      * @return the gate with its measured provenance and any warnings
-     * @throws IllegalArgumentException if the file has no gate for these questions
+     * @throws JevThresholdsException if the file has no gate for these questions
      */
     public ThresholdGate pick(Map<String, Question> questions, String model) {
         List<String> ids = gatedIds(questions);
         var warnings = new ArrayList<String>();
         if (model != null && !model.equals(this.model)) {
-            warnings.add("thresholds were measured on " + this.model + " but this run uses " + model
-                    + "; re-measure after a model change");
+            warnings.add("Thresholds were measured on " + this.model + " but you use " + model
+                    + "; re-measure after a model change.");
         }
         ids.forEach(id -> rewordWarning(id, questions.get(id)).ifPresent(warnings::add));
         String source = ids.size() == 1 ? ids.get(0) : ThresholdGate.COMPOSITE;
@@ -120,18 +122,18 @@ public final class JevThresholds {
 
     private Gate gateFor(List<String> ids) {
         if (ids.isEmpty()) {
-            throw new IllegalArgumentException("thresholds: nothing to gate on (every question is a noul)");
+            throw new JevThresholdsException("Nothing to gate on (every question is a noul).");
         }
         if (ids.size() == 1) {
             return questionGate(ids.get(0));
         }
         if (composite == null) {
-            throw new IllegalArgumentException(
-                    "thresholds file has no composite gate for " + ids + " (" + NO_ROW_GATE + ")");
+            throw new JevThresholdsException(
+                    "The thresholds file has no composite gate for " + ids + " (" + NO_ROW_GATE + ").");
         }
         if (!compositeQuestions.equals(ids)) {
-            throw new IllegalArgumentException("thresholds file gates " + compositeQuestions + " but this run gates "
-                    + ids + "; re-run jev-eval thresholds with these questions");
+            throw new JevThresholdsException("The thresholds file gates " + compositeQuestions
+                    + " but these questions gate " + ids + "; re-run jev-eval thresholds with these questions.");
         }
         return composite;
     }
@@ -139,8 +141,8 @@ public final class JevThresholds {
     private Gate questionGate(String id) {
         Gate gate = questions.get(id);
         if (gate == null) {
-            throw new IllegalArgumentException(
-                    "thresholds file has no gate for \"" + id + "\" (" + NO_QUESTION_GATE + ")");
+            throw new JevThresholdsException(
+                    "The thresholds file has no gate for \"" + id + "\" (" + NO_QUESTION_GATE + ").");
         }
         return gate;
     }
@@ -152,7 +154,7 @@ public final class JevThresholds {
         if (RequestEncoder.questionMap(question).equals(definitions.get(id))) {
             return Optional.empty();
         }
-        return Optional.of(id + " was reworded since it was measured; re-measure");
+        return Optional.of(id + " was reworded since it was measured; re-measure.");
     }
 
     /** The ids of the Choice and Score questions, sorted; a Noul carries no gate confidence. */
@@ -201,8 +203,16 @@ public final class JevThresholds {
         return map.get(key) == null ? null : requireObject(map, key, "thresholds file");
     }
 
-    static IllegalArgumentException malformed(String message) {
-        return new IllegalArgumentException("thresholds file: " + message);
+    private static Object parseJson(String json) {
+        try {
+            return JsonParser.parse(json);
+        } catch (IllegalArgumentException e) {
+            throw new JevThresholdsException("thresholds file: not valid JSON: " + e.getMessage(), e);
+        }
+    }
+
+    static JevThresholdsException malformed(String message) {
+        return new JevThresholdsException("thresholds file: " + message);
     }
 
     /** One measured gate: the cut-point and what it bought on n rows. */
@@ -210,7 +220,7 @@ public final class JevThresholds {
 
         static Gate parse(Map<?, ?> map, String context) {
             double n = number(map, "n", context);
-            if (n != Math.rint(n) || n < 0) {
+            if (n != Math.rint(n) || n < 0 || n > Integer.MAX_VALUE) {
                 throw malformed(context + " has a non-integer \"n\"");
             }
             return new Gate(
@@ -221,7 +231,7 @@ public final class JevThresholds {
         }
 
         private static double number(Map<?, ?> map, String key, String context) {
-            if (map.get(key) instanceof Double d) {
+            if (map.get(key) instanceof Double d && Double.isFinite(d)) {
                 return d;
             }
             throw malformed(context + " is missing number \"" + key + "\"");

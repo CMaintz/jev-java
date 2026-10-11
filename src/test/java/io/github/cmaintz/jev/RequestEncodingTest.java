@@ -37,7 +37,7 @@ class RequestEncodingTest {
     @Test
     void baseUrlTrailingSlashesAreTrimmed() {
         var transport = new StubTransport();
-        TypeSafeClient.builder()
+        JevClient.builder()
                 .apiKey("k")
                 .baseUrl("http://localhost:8080//")
                 .transport(transport)
@@ -114,7 +114,7 @@ class RequestEncodingTest {
 
     @Test
     void builderValidatesItsSettings() {
-        var builder = TypeSafeClient.builder();
+        var builder = JevClient.builder();
         assertThrows(IllegalArgumentException.class, () -> builder.apiKey("   "));
         assertThrows(IllegalArgumentException.class, () -> builder.maxRetries(-1));
         assertThrows(IllegalArgumentException.class, () -> builder.model(""));
@@ -123,23 +123,22 @@ class RequestEncodingTest {
 
     @Test
     void buildRejectsUnusableUrlsAndKeys() {
-        assertThrows(IllegalArgumentException.class, () -> TypeSafeClient.builder()
-                .apiKey("k")
-                .baseUrl("api.typesafe.ai")
-                .build());
-        assertThrows(IllegalArgumentException.class, () -> TypeSafeClient.builder()
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> JevClient.builder().apiKey("k").baseUrl("api.typesafe.ai").build());
+        assertThrows(IllegalArgumentException.class, () -> JevClient.builder()
                 .apiKey("k")
                 .baseUrl("ftp://example.com")
                 .build());
-        assertThrows(IllegalArgumentException.class, () -> TypeSafeClient.builder()
+        assertThrows(IllegalArgumentException.class, () -> JevClient.builder()
                 .apiKey("k")
                 .baseUrl("https://proxy.example.com?x=1")
                 .build());
-        assertThrows(JevException.class, () -> TypeSafeClient.builder()
+        assertThrows(JevException.class, () -> JevClient.builder()
                 .apiKey("ke\ny")
                 .transport(new StubTransport())
                 .build());
-        assertThrows(JevException.class, () -> TypeSafeClient.builder()
+        assertThrows(JevException.class, () -> JevClient.builder()
                 .apiKey("sk-abc€")
                 .transport(new StubTransport())
                 .build());
@@ -148,7 +147,7 @@ class RequestEncodingTest {
     @Test
     void baseUrlMayCarryAPathPrefixAndPort() {
         var transport = new StubTransport();
-        TypeSafeClient.builder()
+        JevClient.builder()
                 .apiKey("k")
                 .baseUrl("http://localhost:8080/jev/")
                 .transport(transport)
@@ -160,7 +159,7 @@ class RequestEncodingTest {
     @Test
     void apiKeyWhitespaceIsStripped() {
         var transport = new StubTransport();
-        TypeSafeClient.builder()
+        JevClient.builder()
                 .apiKey(" secret\n")
                 .transport(transport)
                 .build()

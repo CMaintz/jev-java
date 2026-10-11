@@ -36,7 +36,7 @@ class AsyncTest {
                 return CompletableFuture.completedFuture(new Response(200, NOUL_ANSWER));
             }
         };
-        var client = TypeSafeClient.builder().apiKey("k").transport(transport).build();
+        var client = JevClient.builder().apiKey("k").transport(transport).build();
 
         var response = client.systemOneAsync("s", ONE).get(10, TimeUnit.SECONDS);
 
@@ -90,7 +90,7 @@ class AsyncTest {
         HttpTransport unchecked = (url, headers, body) -> {
             throw new UncheckedIOException(new IOException("reset"));
         };
-        var client = TypeSafeClient.builder().apiKey("k").transport(unchecked).build();
+        var client = JevClient.builder().apiKey("k").transport(unchecked).build();
 
         var blocking = assertThrows(JevException.class, () -> client.systemOne("s", ONE));
         var async = failureOf(client.systemOneAsync("s", ONE));
@@ -104,7 +104,7 @@ class AsyncTest {
         HttpTransport broken = (url, headers, body) -> {
             throw new AssertionError("boom");
         };
-        var client = TypeSafeClient.builder().apiKey("k").transport(broken).build();
+        var client = JevClient.builder().apiKey("k").transport(broken).build();
 
         var cause = failureOf(client.systemOneAsync("s", ONE));
 

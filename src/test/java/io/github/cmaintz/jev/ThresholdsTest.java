@@ -50,6 +50,9 @@ class ThresholdsTest {
         assertEquals(List.of("team"), gate.questionIds());
         assertEquals("jev-latest", gate.model());
         assertEquals(List.of(), gate.warnings());
+        assertEquals(
+                "gate 0.8 from \"team\" (jev-eval: 94.0% accuracy at 61.0% coverage, n=300, model jev-latest)",
+                gate.describe());
     }
 
     @Test
@@ -59,13 +62,16 @@ class ThresholdsTest {
         assertEquals(0.82, gate.threshold());
         assertEquals(ThresholdGate.COMPOSITE, gate.source());
         assertEquals(List.of("sentiment", "team"), gate.questionIds());
+        assertEquals(
+                "gate 0.82 from composite (jev-eval: 93.0% accuracy at 55.0% coverage, n=300, model jev-latest)",
+                gate.describe());
     }
 
     @Test
     void compositeMeasuredOverOtherQuestionsIsRefused() throws Exception {
         var other = new Choice("Which product?", Map.of("a", "A"));
         var error = assertThrows(
-                IllegalArgumentException.class, () -> fixture().pick(questions("team", TEAM, "product", other)));
+                JevThresholdsException.class, () -> fixture().pick(questions("team", TEAM, "product", other)));
 
         assertTrue(error.getMessage().contains("[sentiment, team]"), error.getMessage());
         assertTrue(error.getMessage().contains("[product, team]"), error.getMessage());
@@ -88,9 +94,9 @@ class ThresholdsTest {
         ThresholdGate gate = fixture().pick(questions("team", reworded, "urgent", new Noul("changed")), "jev-2");
 
         assertEquals(2, gate.warnings().size());
-        assertTrue(gate.warnings().get(0).contains("measured on jev-latest but this run uses jev-2"));
+        assertTrue(gate.warnings().get(0).contains("measured on jev-latest but you use jev-2"));
         assertEquals(
-                "team was reworded since it was measured; re-measure",
+                "team was reworded since it was measured; re-measure.",
                 gate.warnings().get(1));
     }
 
@@ -138,12 +144,28 @@ class ThresholdsTest {
         assertMessage(
                 "list of question ids",
                 () -> JevThresholds.parse(file("", ",\"composite\":" + GATE.replace("}", ",\"questions\":[1]}"))));
-        assertThrows(IllegalArgumentException.class, () -> JevThresholds.parse("{"));
+        assertMessage(
+                "missing number \"threshold\"",
+                () -> JevThresholds.parse(file("\"team\":" + GATE.replace("0.8", "1e999"), "")));
+        assertMessage(
+                "non-integer \"n\"",
+                () -> JevThresholds.parse(file("\"team\":" + GATE.replace("10", "3000000000"), "")));
+        assertMessage("not valid JSON", () -> JevThresholds.parse("[".repeat(100_000)));
+        assertThrows(JevThresholdsException.class, () -> JevThresholds.parse("{"));
     }
 
     @Test
-    void ignoresUnknownKeysAndAbsentDefinitions() {
-        JevThresholds thresholds = JevThresholds.parse(file("\"team\":" + GATE, ",\"future\":{\"x\":[1]}"));
+    void describeWritesWholeThresholdsWithoutATrailingZero() {
+        ThresholdGate gate = JevThresholds.parse(file("\"team\":" + GATE.replace("0.8", "1.0"), ""))
+                .pick(questions("team", TEAM));
+
+        assertTrue(gate.describe().startsWith("gate 1 from \"team\""), gate.describe());
+    }
+
+    @Test
+    void ignoresUnknownKeysAndUnusableDefinitions() {
+        JevThresholds thresholds =
+                JevThresholds.parse(file("\"team\":" + GATE, ",\"future\":{\"x\":[1]},\"definitions\":[]"));
 
         assertEquals("jev-latest", thresholds.model());
         assertEquals(
@@ -160,7 +182,7 @@ class ThresholdsTest {
     }
 
     private static void assertMessage(String expected, org.junit.jupiter.api.function.Executable call) {
-        var error = assertThrows(IllegalArgumentException.class, call);
+        var error = assertThrows(JevThresholdsException.class, call);
         assertTrue(error.getMessage().contains(expected), error.getMessage());
     }
 }

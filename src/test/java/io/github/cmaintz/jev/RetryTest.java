@@ -78,7 +78,7 @@ class RetryTest {
     @Test
     void interruptionDuringBackoffStopsRetrying() {
         var transport = new StubTransport().enqueue(429, "{}");
-        var client = TypeSafeClient.builder()
+        var client = JevClient.builder()
                 .apiKey("k")
                 .transport(transport)
                 .delays(new InterruptedDelays())

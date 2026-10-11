@@ -40,7 +40,7 @@ import io.github.cmaintz.jev.*;
 import java.util.List;
 import java.util.Map;
 
-var client = TypeSafeClient.fromEnvironment(); // reads TYPESAFE_API_KEY
+var client = JevClient.fromEnvironment(); // reads TYPESAFE_API_KEY
 
 Map<String, Question> questions = Map.of(
     "team", new Choice(
@@ -126,8 +126,7 @@ which must have been measured over exactly those questions. Nouls are ignored.
 ThresholdGate gate = JevThresholds.load(Path.of("thresholds.json"))
     .pick(questions, "jev-latest");     // model is optional; null skips the check
 gate.warnings().forEach(log::warn);    // model changed, or a question was reworded
-log.info("gate {} ({} accurate at {} coverage, n={}, model {})",
-    gate.threshold(), gate.accuracy(), gate.coverage(), gate.n(), gate.model());
+log.info(gate.describe());           // gate 0.8 from "team" (jev-eval: 94.0% accuracy at ...)
 
 if (gate.shouldEscalate(response)) {   // lowest Choice/Score confidence < threshold
     escalateToHuman();
@@ -135,7 +134,7 @@ if (gate.shouldEscalate(response)) {   // lowest Choice/Score confidence < thres
 ```
 
 A file that is not version 1, or that has no gate for your questions, throws
-`IllegalArgumentException` with the reason. Warnings never throw: they are returned on
+`JevThresholdsException` (a `JevException`) with the reason. Warnings never throw: they are returned on
 `gate.warnings()` for you to log.
 
 `shouldEscalate` fails toward review: a missing answer, an answer that is not a
@@ -167,7 +166,7 @@ restored.
 ## Configuration
 
 ```java
-var client = TypeSafeClient.builder()
+var client = JevClient.builder()
     .apiKey("sk-...")                      // or omit to read TYPESAFE_API_KEY
     .model("jev-latest")                   // tracks the recommended model
     .timeout(Duration.ofSeconds(30))
