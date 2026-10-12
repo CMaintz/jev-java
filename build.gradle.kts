@@ -1,7 +1,7 @@
 plugins {
     `java-library`
     jacoco
-    id("com.diffplug.spotless") version "6.25.0"
+    id("com.diffplug.spotless") version "7.0.0"
     // 0.34.x is the last line that supports Gradle 8.x (0.35 needs 8.13, 0.36+ needs 9).
     id("com.vanniktech.maven.publish") version "0.34.0"
 }
