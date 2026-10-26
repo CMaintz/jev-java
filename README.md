@@ -199,6 +199,18 @@ State may be a `String`, or any tree of `Map` / `List` / `String` / `Number` /
 `Boolean` / `null`; a `Map` gives exact control over field names. Keep the API key
 server-side. The client is thread-safe: build one and reuse it.
 
+## Listing models
+
+`client.models()` (or `modelsAsync()`) returns the models and aliases your account can
+use, each with its description and release date. Aliases such as `jev-latest` move when
+a new version ships; pass a versioned name to pin the thresholds you measured.
+
+```java
+for (ModelInfo m : client.models()) {
+    System.out.println(m.name() + " (" + m.releaseDate() + "): " + m.description());
+}
+```
+
 ## Roadmap
 
 - Publish to Maven Central under `io.github.cmaintz:jev`.
