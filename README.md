@@ -74,13 +74,14 @@ evaluated in parallel, so batching them is close to free. For non-blocking calls
 `client.systemOneAsync(state, questions)`, which returns a `CompletableFuture`; it uses
 `HttpClient.sendAsync` and schedules retry backoff without holding a thread.
 
-## The three primitives
+## The question types
 
 | Question | Ask when | Answer | Answer fields |
 | --- | --- | --- | --- |
 | `Choice` | one of a defined set | `ChoiceAnswer` | `choice()`, `probabilities()` (per option), `confidence()` |
 | `Score` | a position on an ordered scale | `ScoreAnswer` | `score()`, `probabilities()` (per level), `legend()`, `confidence()` |
 | `Noul` | a yes/no condition | `NoulAnswer` | `probability()` (0..1); no confidence |
+| `Box` | where something is in an image | `BoxAnswer` | `top()`, `bottom()`, `left()`, `right()` (fractions), `confidence()` |
 
 Each answer mirrors the question asked under its id. Fetch it with the typed accessors
 `response.choice(id)` / `score(id)` / `noul(id)`, or switch over the sealed `Answer`
@@ -91,6 +92,7 @@ switch (response.get(id)) {
     case ChoiceAnswer c -> ...
     case ScoreAnswer s -> ...
     case NoulAnswer n -> ...
+    case BoxAnswer b -> ...
 }
 ```
 
@@ -199,6 +201,20 @@ var client = JevClient.builder()
 State may be a `String`, or any tree of `Map` / `List` / `String` / `Number` /
 `Boolean` / `null`; a `Map` gives exact control over field names. Keep the API key
 server-side. The client is thread-safe: build one and reuse it.
+
+## Box questions
+
+A `Box` finds where something is in an image and answers with its edges as fractions of
+the image's width and height. It needs an image in the request and Jev 1.14 or later;
+the client sends TypeSafe's images header for you. Images and Box are experimental on
+TypeSafe's side, so the format and limits can change between releases.
+
+```java
+BoxAnswer mug = client.systemOne(state, Map.of("mug", new Box("the coffee mug in `photo`"))).box("mug");
+int x = (int) Math.round(mug.left() * width), y = (int) Math.round(mug.top() * height);
+```
+
+Box answers are never part of a jev-eval threshold gate.
 
 ## Per-call options
 

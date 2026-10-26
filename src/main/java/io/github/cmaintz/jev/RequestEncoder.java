@@ -44,6 +44,7 @@ final class RequestEncoder {
             case Choice c -> "choice";
             case Score s -> "score";
             case Noul n -> "noul";
+            case Box b -> "box";
         };
     }
 
@@ -52,6 +53,7 @@ final class RequestEncoder {
             case Choice choice -> choice.criteria();
             case Score score -> score.criteria();
             case Noul noul -> noulCriteria(noul);
+            case Box box -> null;
         };
     }
 

@@ -15,6 +15,8 @@ final class ApiRequests {
     private static final String ENV_KEY = "TYPESAFE_API_KEY";
     private static final String SYSTEM_ONE_PATH = "/v1/systemone";
     private static final String MODELS_PATH = "/v1/models";
+    /** TypeSafe's opt-in for its experimental image and Box support. */
+    private static final String IMAGES_HEADER = "TypeSafe-Danger-Zone-Images";
 
     private final String baseUrl;
     private final String authorization;
@@ -75,7 +77,11 @@ final class ApiRequests {
             throw new IllegalArgumentException("At least one question is required.");
         }
         String callModel = options.model() != null ? options.model() : model;
-        return post(RequestEncoder.encode(callModel, state, questions), systemOneHeaders(options));
+        var headers = systemOneHeaders(options);
+        if (questions.values().stream().anyMatch(Box.class::isInstance)) {
+            headers.put(IMAGES_HEADER, "true");
+        }
+        return post(RequestEncoder.encode(callModel, state, questions), headers);
     }
 
     /** Compressed once here, so every retry resends the same bytes. */

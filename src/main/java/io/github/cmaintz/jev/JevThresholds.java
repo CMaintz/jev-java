@@ -163,7 +163,7 @@ public final class JevThresholds {
     private static List<String> gatedIds(Map<String, Question> questions) {
         Objects.requireNonNull(questions, "questions");
         return questions.entrySet().stream()
-                .filter(e -> !(e.getValue() instanceof Noul))
+                .filter(e -> e.getValue() instanceof Choice || e.getValue() instanceof Score)
                 .map(Map.Entry::getKey)
                 .sorted()
                 .toList();

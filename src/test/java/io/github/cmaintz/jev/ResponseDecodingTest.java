@@ -121,6 +121,7 @@ class ResponseDecodingTest {
             case ChoiceAnswer c -> "choice " + c.choice();
             case ScoreAnswer s -> "score " + s.score();
             case NoulAnswer n -> "noul " + n.probability();
+            case BoxAnswer b -> "box " + b.left();
         };
     }
 
