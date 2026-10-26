@@ -191,6 +191,7 @@ var client = JevClient.builder()
     .timeout(Duration.ofSeconds(30))
     .maxRetries(3)
     .baseUrl("https://api.typesafe.ai")    // e.g. a proxy
+    .compressRequests(false)               // gzip bodies of 1 KiB+ is on by default
     .transport(customTransport)            // inject an HttpTransport to test offline
     .build();
 ```

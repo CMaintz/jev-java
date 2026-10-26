@@ -11,6 +11,7 @@ public final class JevClientBuilder {
     String model = "jev-latest";
     Duration timeout = Duration.ofSeconds(60);
     int maxRetries = 3;
+    boolean compressRequests = true;
     HttpTransport transport;
     RetryingSender.Delays delays = RetryingSender.REAL_DELAYS;
 
@@ -75,6 +76,18 @@ public final class JevClientBuilder {
             throw new IllegalArgumentException("maxRetries must not be negative.");
         }
         this.maxRetries = value;
+        return this;
+    }
+
+    /**
+     * Whether to gzip request bodies of 1 KiB or more (on by default). Turn it off when a
+     * proxy or gateway at the base URL does not accept compressed bodies.
+     *
+     * @param value whether to compress
+     * @return this builder
+     */
+    public JevClientBuilder compressRequests(boolean value) {
+        this.compressRequests = value;
         return this;
     }
 
