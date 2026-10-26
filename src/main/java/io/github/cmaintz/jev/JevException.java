@@ -28,12 +28,16 @@ public class JevException extends RuntimeException {
     /** The typed exception for a non-2xx {@code status}. */
     static JevException forStatus(int status, String body) {
         return switch (status) {
+            case 400 -> new JevBadRequestException("Bad request: the body broke a request rule.", body);
             case 401 -> new JevAuthException("Unauthorized: invalid or missing API key.", body);
+            case 413 -> new JevPayloadTooLargeException("Payload too large: the body is over 32 MiB.", body);
             case 422 -> new JevValidationException(
                     "Unprocessable entity: the request was rejected as malformed.", body);
             case 429 -> new JevRateLimitException("Rate limit exceeded; retries exhausted.", body);
             case 529 -> new JevOverloadedException("Service overloaded; retries exhausted.", body);
-            default -> new JevException("Unexpected HTTP " + status + " from Jev.", status, body, null);
+            default -> status >= 500
+                    ? new JevServerException("Jev failed with HTTP " + status + "; retries exhausted.", status, body)
+                    : new JevException("Unexpected HTTP " + status + " from Jev.", status, body, null);
         };
     }
 

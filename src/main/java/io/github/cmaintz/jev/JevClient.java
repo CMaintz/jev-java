@@ -182,7 +182,7 @@ public final class JevClient {
         }
 
         /**
-         * Maximum retries after a 429 or 529 before giving up; zero disables retrying.
+         * Maximum retries after a 408, 429 or 5xx before giving up; zero disables retrying.
          *
          * @param value a non-negative count
          * @return this builder
