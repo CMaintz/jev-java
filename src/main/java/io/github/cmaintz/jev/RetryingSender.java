@@ -2,7 +2,6 @@ package io.github.cmaintz.jev;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -48,23 +47,19 @@ final class RetryingSender {
     private static final long MAX_JITTER_MILLIS = 250;
 
     private final HttpTransport transport;
-    private final String url;
-    private final Map<String, String> headers;
     private final int maxRetries;
     private final Delays delays;
 
-    RetryingSender(HttpTransport transport, String url, Map<String, String> headers, int maxRetries, Delays delays) {
+    RetryingSender(HttpTransport transport, int maxRetries, Delays delays) {
         this.transport = transport;
-        this.url = url;
-        this.headers = Map.copyOf(headers);
         this.maxRetries = maxRetries;
         this.delays = delays;
     }
 
     /** The body of the first 2xx response; otherwise the typed {@link JevException}. */
-    String send(byte[] body) {
+    String send(HttpTransport.Request request) {
         for (int attempt = 0; ; attempt++) {
-            HttpTransport.Response response = attempt(body);
+            HttpTransport.Response response = attempt(request);
             if (response.isSuccess()) {
                 return response.body();
             }
@@ -76,26 +71,27 @@ final class RetryingSender {
     }
 
     /** Non-blocking {@link #send}: the future fails with the same typed {@link JevException}. */
-    CompletableFuture<String> sendAsync(byte[] body) {
-        return attemptAsync(body, 0);
+    CompletableFuture<String> sendAsync(HttpTransport.Request request) {
+        return attemptAsync(request, 0);
     }
 
-    private CompletableFuture<String> attemptAsync(byte[] body, int attempt) {
-        return startAsync(body)
+    private CompletableFuture<String> attemptAsync(HttpTransport.Request request, int attempt) {
+        return startAsync(request)
                 .exceptionallyCompose(e -> CompletableFuture.failedFuture(transportError(e)))
-                .thenCompose(response -> afterAsync(response, body, attempt));
+                .thenCompose(response -> afterAsync(response, request, attempt));
     }
 
     /** The transport's future, with a synchronous throw from a custom transport folded into it. */
-    private CompletableFuture<HttpTransport.Response> startAsync(byte[] body) {
+    private CompletableFuture<HttpTransport.Response> startAsync(HttpTransport.Request request) {
         try {
-            return transport.sendAsync(url, headers, body);
+            return transport.sendAsync(request);
         } catch (RuntimeException e) {
             return CompletableFuture.failedFuture(e);
         }
     }
 
-    private CompletableFuture<String> afterAsync(HttpTransport.Response response, byte[] body, int attempt) {
+    private CompletableFuture<String> afterAsync(
+            HttpTransport.Response response, HttpTransport.Request request, int attempt) {
         if (response.isSuccess()) {
             return CompletableFuture.completedFuture(response.body());
         }
@@ -103,7 +99,7 @@ final class RetryingSender {
             return CompletableFuture.failedFuture(JevException.forStatus(response.status(), response.body()));
         }
         Executor later = delays.after(delayFor(response, attempt));
-        return CompletableFuture.runAsync(() -> {}, later).thenCompose(ignored -> attemptAsync(body, attempt + 1));
+        return CompletableFuture.runAsync(() -> {}, later).thenCompose(ignored -> attemptAsync(request, attempt + 1));
     }
 
     private boolean shouldRetry(HttpTransport.Response response, int attempt) {
@@ -114,9 +110,9 @@ final class RetryingSender {
         return status == 408 || status == 429 || status >= 500;
     }
 
-    private HttpTransport.Response attempt(byte[] body) {
+    private HttpTransport.Response attempt(HttpTransport.Request request) {
         try {
-            return transport.send(url, headers, body);
+            return transport.send(request);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw transportError(e);
