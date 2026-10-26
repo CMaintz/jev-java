@@ -43,7 +43,7 @@ public final class JevClient {
     }
 
     /**
-     * Evaluate {@code questions} against {@code state}. State may be a String, or any
+     * Evaluate {@code questions} against {@code state}. State may be a String, an {@link Image}, or any
      * tree of Map/List/String/Number/Boolean/null (a {@code Map} gives exact control
      * over field names). Answers come back keyed by the same ids.
      *

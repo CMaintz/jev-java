@@ -1,7 +1,8 @@
 package io.github.cmaintz.jev;
 
-import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -12,13 +13,37 @@ final class RequestEncoder {
 
     private RequestEncoder() {}
 
-    /** The UTF-8 JSON body for {@code questions} asked about {@code state}. */
-    static byte[] encode(String model, Object state, Map<String, Question> questions) {
+    /**
+     * The JSON request and the distinct images it refers to, in first-use order.
+     *
+     * @param json the request JSON, with an {@code assets} entry per image
+     * @param images the images to send as file parts; empty for a plain JSON request
+     */
+    record Encoded(String json, List<Image> images) {}
+
+    /** The request for {@code questions} asked about {@code state}. */
+    static Encoded encode(String model, Object state, Map<String, Question> questions) {
         var root = new LinkedHashMap<String, Object>();
         root.put("model", model);
         root.put("state", state);
         root.put("questions", questionsMap(questions));
-        return JsonWriter.write(root).getBytes(StandardCharsets.UTF_8);
+        var found = new LinkedHashSet<Image>();
+        String json = JsonWriter.write(root, found);
+        if (found.isEmpty()) {
+            return new Encoded(json, List.of());
+        }
+        List<Image> images = List.copyOf(found);
+        root.put("assets", assets(images));
+        return new Encoded(JsonWriter.write(root), images);
+    }
+
+    /** Each image by reference, pointing at the multipart file part that carries it. */
+    private static Map<String, Object> assets(List<Image> images) {
+        var assets = new LinkedHashMap<String, Object>();
+        for (int i = 0; i < images.size(); i++) {
+            assets.put(images.get(i).reference(), Map.of("type", "image", "part", Multipart.partName(i)));
+        }
+        return assets;
     }
 
     private static Map<String, Object> questionsMap(Map<String, Question> questions) {

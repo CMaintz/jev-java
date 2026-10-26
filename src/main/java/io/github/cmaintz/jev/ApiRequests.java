@@ -1,6 +1,7 @@
 package io.github.cmaintz.jev;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -77,11 +78,18 @@ final class ApiRequests {
             throw new IllegalArgumentException("At least one question is required.");
         }
         String callModel = options.model() != null ? options.model() : model;
+        var encoded = RequestEncoder.encode(callModel, state, questions);
         var headers = systemOneHeaders(options);
-        if (questions.values().stream().anyMatch(Box.class::isInstance)) {
+        if (!encoded.images().isEmpty() || questions.values().stream().anyMatch(Box.class::isInstance)) {
             headers.put(IMAGES_HEADER, "true");
         }
-        return post(RequestEncoder.encode(callModel, state, questions), headers);
+        if (encoded.images().isEmpty()) {
+            headers.put("Content-Type", "application/json");
+            return post(encoded.json().getBytes(StandardCharsets.UTF_8), headers);
+        }
+        var multipart = Multipart.of(encoded.json(), encoded.images());
+        headers.put("Content-Type", multipart.contentType());
+        return post(multipart.bytes(), headers);
     }
 
     /** Compressed once here, so every retry resends the same bytes. */
@@ -96,7 +104,6 @@ final class ApiRequests {
     private Map<String, String> systemOneHeaders(SystemOneOptions options) {
         var headers = new HashMap<String, String>();
         headers.put("Authorization", authorization);
-        headers.put("Content-Type", "application/json");
         if (options.longContext()) {
             headers.put("TypeSafe-Danger-Zone-Long-Context", "true");
         }

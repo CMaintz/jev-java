@@ -8,7 +8,7 @@ import java.util.Objects;
  * each must describe a concrete situation and stand on its own. The answer's score can
  * fall between two levels, with a probability across levels and a confidence.
  *
- * <p>Instructions and each level are text, or structured JSON as a {@code Map} or
+ * <p>Instructions and each level are text, an {@link Image}, {@link TextWithImages}, or structured JSON as a {@code Map} or
  * {@code List}; see {@link Question#instructions()}.
  *
  * @param instructions the dimension to rate, e.g. "How frustrated the customer appears"
