@@ -6,6 +6,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
+- `Box` questions (find where something is in an image) answered by `BoxAnswer(top, bottom, left, right, confidence)`, with `SystemOneResponse.box(id)` / `boxes()`. Requests with a Box send `TypeSafe-Danger-Zone-Images: true`. Thresholds only ever gate Choice and Score questions.
 - Request bodies of 1 KiB or more are gzip-compressed (`Content-Encoding: gzip`), on by default; `JevClientBuilder.compressRequests(false)` turns it off for proxies that cannot take compressed bodies. Gzip rather than the official SDKs' zstd keeps the client dependency-free.
 - `SystemOneOptions` for a single call: a model override (e.g. `jev-preview`) and long context (the `TypeSafe-Danger-Zone-Long-Context` header), via `systemOne(state, questions, options)` and its async twin.
 - `JevClient.models()` / `modelsAsync()` list the models and aliases available to the account (`GET /v1/models`) as `ModelInfo(name, description, releaseDate)`.

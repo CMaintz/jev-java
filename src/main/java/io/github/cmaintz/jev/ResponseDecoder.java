@@ -54,6 +54,7 @@ final class ResponseDecoder {
                     legend(node.get("legend")),
                     optionalDouble(node, "confidence"));
             case Noul n -> new NoulAnswer(requireDouble(node, "noul"));
+            case Box b -> box(node);
         };
     }
 
@@ -76,6 +77,16 @@ final class ResponseDecoder {
             return n.doubleValue();
         }
         throw malformed("missing numeric field '" + field + "'");
+    }
+
+    private BoxAnswer box(Map<?, ?> node) {
+        Map<?, ?> edges = asObject(node.get("box"), "box");
+        return new BoxAnswer(
+                requireDouble(edges, "top"),
+                requireDouble(edges, "bottom"),
+                requireDouble(edges, "left"),
+                requireDouble(edges, "right"),
+                optionalDouble(node, "confidence"));
     }
 
     private static double optionalDouble(Map<?, ?> node, String field) {

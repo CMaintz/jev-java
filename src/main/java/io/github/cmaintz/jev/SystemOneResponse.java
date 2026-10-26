@@ -71,6 +71,16 @@ public record SystemOneResponse(String model, Map<String, Answer> answers, Usage
     }
 
     /**
+     * The answer to the {@link Box} asked under {@code questionId}; throws like {@link #choice(String)}.
+     *
+     * @param questionId the id the Box was sent under
+     * @return the box edges and confidence
+     */
+    public BoxAnswer box(String questionId) {
+        return get(questionId, BoxAnswer.class);
+    }
+
+    /**
      * Every {@link ChoiceAnswer}, keyed by question id.
      *
      * @return an unmodifiable map in response order
@@ -95,6 +105,15 @@ public record SystemOneResponse(String model, Map<String, Answer> answers, Usage
      */
     public Map<String, NoulAnswer> nouls() {
         return filter(NoulAnswer.class);
+    }
+
+    /**
+     * Every {@link BoxAnswer}, keyed by question id.
+     *
+     * @return an unmodifiable map in response order
+     */
+    public Map<String, BoxAnswer> boxes() {
+        return filter(BoxAnswer.class);
     }
 
     private <T extends Answer> T get(String questionId, Class<T> type) {

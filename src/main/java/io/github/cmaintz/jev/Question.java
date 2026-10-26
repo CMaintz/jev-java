@@ -3,10 +3,11 @@ package io.github.cmaintz.jev;
 /**
  * A single judgment to ask Jev about the shared {@code state}. Pick the implementation
  * by what the answer means: {@link Choice} for one of a defined set, {@link Score} for a
- * position on an ordered scale, {@link Noul} for a yes/no probability. Independent
+ * position on an ordered scale, {@link Noul} for a yes/no probability, {@link Box} for
+ * where something is in an image. Independent
  * questions sent together are evaluated in parallel.
  */
-public sealed interface Question permits Noul, Choice, Score {
+public sealed interface Question permits Noul, Choice, Score, Box {
 
     /**
      * The judgment to make: natural-language text, or structured JSON (a {@code Map} or

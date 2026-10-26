@@ -7,4 +7,4 @@ package io.github.cmaintz.jev;
  * {@link CalibratedAnswer}s, carrying a confidence. Switch over it exhaustively, or use
  * the typed accessors on {@link SystemOneResponse}.
  */
-public sealed interface Answer permits CalibratedAnswer, NoulAnswer {}
+public sealed interface Answer permits CalibratedAnswer, NoulAnswer, BoxAnswer {}
