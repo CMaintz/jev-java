@@ -27,6 +27,7 @@ final class StubTransport implements HttpTransport {
     volatile String lastUrl;
     volatile Map<String, String> lastHeaders;
     volatile String lastBody;
+    volatile byte[] lastBodyBytes;
 
     StubTransport enqueue(int status, String body) {
         return enqueue(new Response(status, body));
@@ -58,6 +59,7 @@ final class StubTransport implements HttpTransport {
         lastMethod = request.method();
         lastUrl = request.url();
         lastHeaders = request.headers();
+        lastBodyBytes = request.body();
         lastBody = request.body() == null ? null : new String(request.body(), StandardCharsets.UTF_8);
         if (failure != null) {
             throw failure;

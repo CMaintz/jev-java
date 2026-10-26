@@ -19,11 +19,13 @@ final class ApiRequests {
     private final String baseUrl;
     private final String authorization;
     private final String model;
+    private final boolean compress;
 
-    ApiRequests(String baseUrl, String apiKey, String model) {
+    ApiRequests(String baseUrl, String apiKey, String model, boolean compress) {
         this.baseUrl = baseUrl(baseUrl);
         this.authorization = "Bearer " + resolveApiKey(apiKey);
         this.model = model;
+        this.compress = compress;
     }
 
     /** The base URL without trailing slashes, so a proxy path prefix is kept in front of each endpoint. */
@@ -73,8 +75,16 @@ final class ApiRequests {
             throw new IllegalArgumentException("At least one question is required.");
         }
         String callModel = options.model() != null ? options.model() : model;
-        byte[] body = RequestEncoder.encode(callModel, state, questions);
-        return new HttpTransport.Request("POST", baseUrl + SYSTEM_ONE_PATH, systemOneHeaders(options), body);
+        return post(RequestEncoder.encode(callModel, state, questions), systemOneHeaders(options));
+    }
+
+    /** Compressed once here, so every retry resends the same bytes. */
+    private HttpTransport.Request post(byte[] body, Map<String, String> headers) {
+        if (compress && body.length >= Gzip.MIN_BYTES) {
+            headers.put("Content-Encoding", "gzip");
+            body = Gzip.compress(body);
+        }
+        return new HttpTransport.Request("POST", baseUrl + SYSTEM_ONE_PATH, headers, body);
     }
 
     private Map<String, String> systemOneHeaders(SystemOneOptions options) {

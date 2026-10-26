@@ -16,7 +16,7 @@ public final class JevClient {
     private final RetryingSender sender;
 
     JevClient(JevClientBuilder builder) {
-        this.requests = new ApiRequests(builder.baseUrl, builder.apiKey, builder.model);
+        this.requests = new ApiRequests(builder.baseUrl, builder.apiKey, builder.model, builder.compressRequests);
         this.sender = new RetryingSender(
                 builder.transport != null ? builder.transport : new JdkHttpTransport(builder.timeout),
                 builder.maxRetries,
