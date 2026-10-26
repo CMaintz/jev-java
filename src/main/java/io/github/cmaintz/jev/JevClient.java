@@ -1,10 +1,7 @@
 package io.github.cmaintz.jev;
 
-import java.net.URI;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -15,56 +12,15 @@ import java.util.concurrent.CompletableFuture;
  */
 public final class JevClient {
 
-    private static final String ENV_KEY = "TYPESAFE_API_KEY";
-    private static final String SYSTEM_ONE_PATH = "/v1/systemone";
-    private static final String MODELS_PATH = "/v1/models";
-
-    private final String model;
-    private final String baseUrl;
-    private final String authorization;
+    private final ApiRequests requests;
     private final RetryingSender sender;
 
-    private JevClient(Builder builder) {
-        this.model = builder.model;
-        this.baseUrl = baseUrl(builder.baseUrl);
-        this.authorization = "Bearer " + resolveApiKey(builder.apiKey);
+    JevClient(JevClientBuilder builder) {
+        this.requests = new ApiRequests(builder.baseUrl, builder.apiKey, builder.model);
         this.sender = new RetryingSender(
                 builder.transport != null ? builder.transport : new JdkHttpTransport(builder.timeout),
                 builder.maxRetries,
                 builder.delays);
-    }
-
-    /** The base URL without trailing slashes, so a proxy path prefix is kept in front of each endpoint. */
-    private static String baseUrl(String configured) {
-        String base = configured.replaceAll("/+$", "");
-        if (!isHttpUrl(base + SYSTEM_ONE_PATH)) {
-            throw new IllegalArgumentException(
-                    "baseUrl must be an absolute http(s) URL without a query or fragment: " + configured);
-        }
-        return base;
-    }
-
-    private static boolean isHttpUrl(String url) {
-        try {
-            URI uri = URI.create(url);
-            String scheme = uri.getScheme();
-            boolean http = "https".equalsIgnoreCase(scheme) || "http".equalsIgnoreCase(scheme);
-            return http && uri.getHost() != null && uri.getRawQuery() == null && uri.getRawFragment() == null;
-        } catch (IllegalArgumentException e) {
-            return false;
-        }
-    }
-
-    private static String resolveApiKey(String configured) {
-        String key = configured != null ? configured : System.getenv(ENV_KEY);
-        if (key == null || key.isBlank()) {
-            throw new JevException("No API key. Set " + ENV_KEY + " or Builder.apiKey.", 0, null, null);
-        }
-        key = key.strip();
-        if (key.chars().anyMatch(c -> c < 0x21 || c > 0x7e)) {
-            throw new JevException("The API key may only contain printable ASCII characters.", 0, null, null);
-        }
-        return key;
     }
 
     /**
@@ -72,8 +28,8 @@ public final class JevClient {
      *
      * @return a fresh builder
      */
-    public static Builder builder() {
-        return new Builder();
+    public static JevClientBuilder builder() {
+        return new JevClientBuilder();
     }
 
     /**
@@ -98,7 +54,7 @@ public final class JevClient {
      * @throws JevException on any network, HTTP, or response-format failure
      */
     public SystemOneResponse systemOne(Object state, Map<String, Question> questions) {
-        String body = sender.send(systemOneRequest(state, questions));
+        String body = sender.send(requests.systemOne(state, questions));
         return ResponseDecoder.decode(body, questions);
     }
 
@@ -113,7 +69,7 @@ public final class JevClient {
      * @throws IllegalArgumentException immediately, for the same invalid arguments as the blocking call
      */
     public CompletableFuture<SystemOneResponse> systemOneAsync(Object state, Map<String, Question> questions) {
-        return sender.sendAsync(systemOneRequest(state, questions))
+        return sender.sendAsync(requests.systemOne(state, questions))
                 .thenApply(body -> ResponseDecoder.decode(body, questions));
     }
 
@@ -125,7 +81,7 @@ public final class JevClient {
      * @throws JevException on any network, HTTP, or response-format failure
      */
     public List<ModelInfo> models() {
-        return ModelsDecoder.decode(sender.send(modelsRequest()));
+        return ModelsDecoder.decode(sender.send(requests.models()));
     }
 
     /**
@@ -135,125 +91,6 @@ public final class JevClient {
      *     {@link JevException} that {@link #models()} would throw
      */
     public CompletableFuture<List<ModelInfo>> modelsAsync() {
-        return sender.sendAsync(modelsRequest()).thenApply(ModelsDecoder::decode);
-    }
-
-    private HttpTransport.Request modelsRequest() {
-        return new HttpTransport.Request("GET", baseUrl + MODELS_PATH, Map.of("Authorization", authorization), null);
-    }
-
-    private HttpTransport.Request systemOneRequest(Object state, Map<String, Question> questions) {
-        Objects.requireNonNull(state, "state");
-        Objects.requireNonNull(questions, "questions");
-        if (questions.isEmpty()) {
-            throw new IllegalArgumentException("At least one question is required.");
-        }
-        byte[] body = RequestEncoder.encode(model, state, questions);
-        var headers = Map.of("Authorization", authorization, "Content-Type", "application/json");
-        return new HttpTransport.Request("POST", baseUrl + SYSTEM_ONE_PATH, headers, body);
-    }
-
-    /** Fluent builder for {@link JevClient}. */
-    public static final class Builder {
-
-        private String apiKey;
-        private String baseUrl = "https://api.typesafe.ai";
-        private String model = "jev-latest";
-        private Duration timeout = Duration.ofSeconds(60);
-        private int maxRetries = 3;
-        private HttpTransport transport;
-        private RetryingSender.Delays delays = RetryingSender.REAL_DELAYS;
-
-        private Builder() {}
-
-        /**
-         * API key. If unset, {@code TYPESAFE_API_KEY} is used.
-         *
-         * @param value the key; surrounding whitespace is stripped
-         * @return this builder
-         */
-        public Builder apiKey(String value) {
-            this.apiKey = Preconditions.requireText(value, "apiKey");
-            return this;
-        }
-
-        /**
-         * Service base address; {@code /v1/systemone} is appended to it.
-         *
-         * @param value an absolute http(s) URL without a query or fragment, e.g. a proxy
-         * @return this builder
-         */
-        public Builder baseUrl(String value) {
-            this.baseUrl = Preconditions.requireText(value, "baseUrl");
-            return this;
-        }
-
-        /**
-         * Model id; defaults to {@code jev-latest}.
-         *
-         * @param value the model
-         * @return this builder
-         */
-        public Builder model(String value) {
-            this.model = Preconditions.requireText(value, "model");
-            return this;
-        }
-
-        /**
-         * Per-request and connect timeout for the default transport.
-         *
-         * @param value a positive duration
-         * @return this builder
-         */
-        public Builder timeout(Duration value) {
-            Objects.requireNonNull(value, "timeout");
-            if (value.isNegative() || value.isZero()) {
-                throw new IllegalArgumentException("timeout must be positive.");
-            }
-            this.timeout = value;
-            return this;
-        }
-
-        /**
-         * Maximum retries after a 408, 429 or 5xx before giving up; zero disables retrying.
-         *
-         * @param value a non-negative count
-         * @return this builder
-         */
-        public Builder maxRetries(int value) {
-            if (value < 0) {
-                throw new IllegalArgumentException("maxRetries must not be negative.");
-            }
-            this.maxRetries = value;
-            return this;
-        }
-
-        /**
-         * Inject a transport (e.g. a stub for offline tests).
-         *
-         * @param value the transport
-         * @return this builder
-         */
-        public Builder transport(HttpTransport value) {
-            this.transport = Objects.requireNonNull(value, "transport");
-            return this;
-        }
-
-        /** Test seam: replaces the real waits between retries. */
-        Builder delays(RetryingSender.Delays value) {
-            this.delays = Objects.requireNonNull(value, "delays");
-            return this;
-        }
-
-        /**
-         * Build the client.
-         *
-         * @return the client
-         * @throws IllegalArgumentException if the base URL is not an absolute http(s) URL, or has a query or fragment
-         * @throws JevException if no usable API key is configured or found in the environment
-         */
-        public JevClient build() {
-            return new JevClient(this);
-        }
+        return sender.sendAsync(requests.models()).thenApply(ModelsDecoder::decode);
     }
 }
