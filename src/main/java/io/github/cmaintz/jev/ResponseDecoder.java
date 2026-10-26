@@ -15,10 +15,10 @@ import java.util.Map;
  */
 final class ResponseDecoder {
 
-    private final String body;
+    private final ResponseBody body;
 
     private ResponseDecoder(String body) {
-        this.body = body;
+        this.body = new ResponseBody(body);
     }
 
     static SystemOneResponse decode(String body, Map<String, Question> questions) {
@@ -26,17 +26,9 @@ final class ResponseDecoder {
     }
 
     private SystemOneResponse decode(Map<String, Question> questions) {
-        Map<?, ?> root = asObject(parse(), "response");
+        Map<?, ?> root = asObject(body.parse(), "response");
         String model = root.get("model") instanceof String s ? s : null;
         return new SystemOneResponse(model, answers(root.get("answers"), questions), usage(root.get("usage")));
-    }
-
-    private Object parse() {
-        try {
-            return JsonParser.parse(body);
-        } catch (IllegalArgumentException e) {
-            throw new JevException("Malformed response: " + e.getMessage(), 0, body, e);
-        }
     }
 
     private Map<String, Answer> answers(Object node, Map<String, Question> questions) {
@@ -53,7 +45,7 @@ final class ResponseDecoder {
     private Answer answer(Question question, Map<?, ?> node) {
         return switch (question) {
             case Choice c -> new ChoiceAnswer(
-                    requireString(node, "choice"),
+                    body.requireString(node, "choice"),
                     doubleMap(node.get("probabilities")),
                     optionalDouble(node, "confidence"));
             case Score s -> new ScoreAnswer(
@@ -77,13 +69,6 @@ final class ResponseDecoder {
             return map;
         }
         throw malformed(what + " is not a JSON object");
-    }
-
-    private String requireString(Map<?, ?> node, String field) {
-        if (node.get(field) instanceof String s) {
-            return s;
-        }
-        throw malformed("missing string field '" + field + "'");
     }
 
     private double requireDouble(Map<?, ?> node, String field) {
@@ -154,6 +139,6 @@ final class ResponseDecoder {
     }
 
     private JevException malformed(String detail) {
-        return new JevException("Malformed response: " + detail + ".", 0, body, null);
+        return body.malformed(detail);
     }
 }

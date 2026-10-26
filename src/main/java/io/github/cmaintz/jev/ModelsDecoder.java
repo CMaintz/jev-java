@@ -11,10 +11,10 @@ import java.util.Map;
  */
 final class ModelsDecoder {
 
-    private final String body;
+    private final ResponseBody body;
 
     private ModelsDecoder(String body) {
-        this.body = body;
+        this.body = new ResponseBody(body);
     }
 
     static List<ModelInfo> decode(String body) {
@@ -22,7 +22,7 @@ final class ModelsDecoder {
     }
 
     private List<ModelInfo> decode() {
-        if (!(parse() instanceof Map<?, ?> root) || !(root.get("models") instanceof List<?> models)) {
+        if (!(body.parse() instanceof Map<?, ?> root) || !(root.get("models") instanceof List<?> models)) {
             throw malformed("expected an object with a \"models\" list");
         }
         return models.stream().map(this::model).toList();
@@ -32,22 +32,10 @@ final class ModelsDecoder {
         if (!(node instanceof Map<?, ?> map)) {
             throw malformed("a model entry is not an object");
         }
-        return new ModelInfo(text(map, "name"), text(map, "description"), date(text(map, "release_date")));
-    }
-
-    private Object parse() {
-        try {
-            return JsonParser.parse(body);
-        } catch (IllegalArgumentException e) {
-            throw new JevException("Malformed response: " + e.getMessage(), 0, body, e);
-        }
-    }
-
-    private String text(Map<?, ?> map, String field) {
-        if (map.get(field) instanceof String value) {
-            return value;
-        }
-        throw malformed("missing string field '" + field + "'");
+        return new ModelInfo(
+                body.requireString(map, "name"),
+                body.requireString(map, "description"),
+                date(body.requireString(map, "release_date")));
     }
 
     private LocalDate date(String value) {
@@ -59,6 +47,6 @@ final class ModelsDecoder {
     }
 
     private JevException malformed(String detail) {
-        return new JevException("Malformed response: " + detail + ".", 0, body, null);
+        return body.malformed(detail);
     }
 }
