@@ -54,6 +54,23 @@ class ResponseDecodingTest {
     }
 
     @Test
+    void readsScoreProbabilitiesKeyedByLevelInLevelOrder() {
+        var answer = decode("{\"answers\":{\"anger\":{\"score\":1.7,"
+                        + "\"probabilities\":{\"2\":0.8,\"0\":0.1,\"1\":0.1},\"confidence\":0.55}}}")
+                .score("anger");
+
+        assertEquals(List.of(0.1, 0.1, 0.8), answer.probabilities());
+    }
+
+    @Test
+    void rejectsScoreProbabilitiesWithANonLevelKey() {
+        var error = assertThrows(
+                JevException.class,
+                () -> decode("{\"answers\":{\"anger\":{\"score\":1,\"probabilities\":{\"high\":1.0}}}}"));
+        assertTrue(error.getMessage().contains("level"), error.getMessage());
+    }
+
+    @Test
     void readsNoulAndTreatsMissingUsageAsNull() {
         var response = decode("{\"answers\":{\"refund\":{\"noul\":0.85}}}");
 
