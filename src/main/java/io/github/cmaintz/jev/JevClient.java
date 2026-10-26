@@ -18,14 +18,16 @@ public final class JevClient {
     private static final String PATH = "/v1/systemone";
 
     private final String model;
+    private final String endpoint;
+    private final String authorization;
     private final RetryingSender sender;
 
     private JevClient(Builder builder) {
         this.model = builder.model;
+        this.endpoint = endpoint(builder.baseUrl);
+        this.authorization = "Bearer " + resolveApiKey(builder.apiKey);
         this.sender = new RetryingSender(
                 builder.transport != null ? builder.transport : new JdkHttpTransport(builder.timeout),
-                endpoint(builder.baseUrl),
-                Map.of("Authorization", "Bearer " + resolveApiKey(builder.apiKey), "Content-Type", "application/json"),
                 builder.maxRetries,
                 builder.delays);
     }
@@ -93,7 +95,7 @@ public final class JevClient {
      * @throws JevException on any network, HTTP, or response-format failure
      */
     public SystemOneResponse systemOne(Object state, Map<String, Question> questions) {
-        String body = sender.send(encode(state, questions));
+        String body = sender.send(systemOneRequest(state, questions));
         return ResponseDecoder.decode(body, questions);
     }
 
@@ -108,16 +110,19 @@ public final class JevClient {
      * @throws IllegalArgumentException immediately, for the same invalid arguments as the blocking call
      */
     public CompletableFuture<SystemOneResponse> systemOneAsync(Object state, Map<String, Question> questions) {
-        return sender.sendAsync(encode(state, questions)).thenApply(body -> ResponseDecoder.decode(body, questions));
+        return sender.sendAsync(systemOneRequest(state, questions))
+                .thenApply(body -> ResponseDecoder.decode(body, questions));
     }
 
-    private byte[] encode(Object state, Map<String, Question> questions) {
+    private HttpTransport.Request systemOneRequest(Object state, Map<String, Question> questions) {
         Objects.requireNonNull(state, "state");
         Objects.requireNonNull(questions, "questions");
         if (questions.isEmpty()) {
             throw new IllegalArgumentException("At least one question is required.");
         }
-        return RequestEncoder.encode(model, state, questions);
+        byte[] body = RequestEncoder.encode(model, state, questions);
+        var headers = Map.of("Authorization", authorization, "Content-Type", "application/json");
+        return new HttpTransport.Request("POST", endpoint, headers, body);
     }
 
     /** Fluent builder for {@link JevClient}. */

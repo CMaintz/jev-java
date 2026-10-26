@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
@@ -15,37 +16,51 @@ import java.util.concurrent.CompletableFuture;
 public interface HttpTransport {
 
     /**
-     * POST {@code body} to {@code url} with {@code headers} and return the raw response.
+     * Perform {@code request} and return the raw response.
      *
-     * @param url the absolute endpoint
-     * @param headers request headers to set
-     * @param body the request body
+     * @param request what to send
      * @return the raw response, whatever its status
      * @throws IOException on a transport failure
      * @throws InterruptedException if the calling thread is interrupted
      */
-    Response send(String url, Map<String, String> headers, byte[] body) throws IOException, InterruptedException;
+    Response send(Request request) throws IOException, InterruptedException;
 
     /**
      * Non-blocking variant of {@link #send}. The default runs {@code send} on a virtual
      * thread so a blocking transport never ties up a shared pool; override it when the
      * underlying client is natively asynchronous.
      *
-     * @param url as for {@link #send}
-     * @param headers as for {@link #send}
-     * @param body as for {@link #send}
+     * @param request as for {@link #send}
      * @return a future completing with the raw response, or exceptionally on a transport failure
      */
-    default CompletableFuture<Response> sendAsync(String url, Map<String, String> headers, byte[] body) {
+    default CompletableFuture<Response> sendAsync(Request request) {
         var future = new CompletableFuture<Response>();
         Thread.ofVirtual().start(() -> {
             try {
-                future.complete(send(url, headers, body));
+                future.complete(send(request));
             } catch (Throwable e) { // even an Error must complete the future, or the caller hangs
                 future.completeExceptionally(e);
             }
         });
         return future;
+    }
+
+    /**
+     * One HTTP request.
+     *
+     * @param method {@code GET} or {@code POST}
+     * @param url the absolute URL
+     * @param headers request headers to set
+     * @param body the request body, or null for none; not copied, so do not change it after sending
+     */
+    record Request(String method, String url, Map<String, String> headers, byte[] body) {
+
+        /** Requires the method and URL, and copies the headers. */
+        public Request {
+            Objects.requireNonNull(method, "method");
+            Objects.requireNonNull(url, "url");
+            headers = Map.copyOf(headers);
+        }
     }
 
     /**

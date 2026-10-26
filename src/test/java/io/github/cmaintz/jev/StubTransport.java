@@ -23,6 +23,7 @@ final class StubTransport implements HttpTransport {
     final List<Duration> waits = new CopyOnWriteArrayList<>();
 
     volatile int calls;
+    volatile String lastMethod;
     volatile String lastUrl;
     volatile Map<String, String> lastHeaders;
     volatile String lastBody;
@@ -52,11 +53,12 @@ final class StubTransport implements HttpTransport {
     }
 
     @Override
-    public synchronized Response send(String url, Map<String, String> headers, byte[] body) throws IOException {
+    public synchronized Response send(Request request) throws IOException {
         calls++;
-        lastUrl = url;
-        lastHeaders = headers;
-        lastBody = new String(body, StandardCharsets.UTF_8);
+        lastMethod = request.method();
+        lastUrl = request.url();
+        lastHeaders = request.headers();
+        lastBody = request.body() == null ? null : new String(request.body(), StandardCharsets.UTF_8);
         if (failure != null) {
             throw failure;
         }

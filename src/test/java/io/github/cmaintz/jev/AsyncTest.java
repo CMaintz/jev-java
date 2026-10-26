@@ -27,12 +27,12 @@ class AsyncTest {
     void asyncUsesTheTransportsNonBlockingSend() throws Exception {
         HttpTransport transport = new HttpTransport() {
             @Override
-            public Response send(String url, Map<String, String> headers, byte[] body) {
+            public Response send(Request request) {
                 throw new AssertionError("the async path must not call the blocking send");
             }
 
             @Override
-            public CompletableFuture<Response> sendAsync(String url, Map<String, String> headers, byte[] body) {
+            public CompletableFuture<Response> sendAsync(Request request) {
                 return CompletableFuture.completedFuture(new Response(200, NOUL_ANSWER));
             }
         };
@@ -87,7 +87,7 @@ class AsyncTest {
 
     @Test
     void bothPathsWrapTheSameTransportFailureTheSameWay() {
-        HttpTransport unchecked = (url, headers, body) -> {
+        HttpTransport unchecked = request -> {
             throw new UncheckedIOException(new IOException("reset"));
         };
         var client = JevClient.builder().apiKey("k").transport(unchecked).build();
@@ -101,7 +101,7 @@ class AsyncTest {
 
     @Test
     void defaultSendAsyncCompletesEvenWhenSendThrowsAnError() {
-        HttpTransport broken = (url, headers, body) -> {
+        HttpTransport broken = request -> {
             throw new AssertionError("boom");
         };
         var client = JevClient.builder().apiKey("k").transport(broken).build();

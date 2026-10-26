@@ -23,22 +23,24 @@ final class JdkHttpTransport implements HttpTransport {
     }
 
     @Override
-    public Response send(String url, Map<String, String> headers, byte[] body)
-            throws IOException, InterruptedException {
-        return toResponse(client.send(request(url, headers, body), HttpResponse.BodyHandlers.ofString()));
+    public Response send(Request request) throws IOException, InterruptedException {
+        return toResponse(client.send(jdkRequest(request), HttpResponse.BodyHandlers.ofString()));
     }
 
     @Override
-    public CompletableFuture<Response> sendAsync(String url, Map<String, String> headers, byte[] body) {
-        return client.sendAsync(request(url, headers, body), HttpResponse.BodyHandlers.ofString())
+    public CompletableFuture<Response> sendAsync(Request request) {
+        return client.sendAsync(jdkRequest(request), HttpResponse.BodyHandlers.ofString())
                 .thenApply(JdkHttpTransport::toResponse);
     }
 
-    private HttpRequest request(String url, Map<String, String> headers, byte[] body) {
-        var builder = HttpRequest.newBuilder(URI.create(url))
+    private HttpRequest jdkRequest(Request request) {
+        var body = request.body() == null
+                ? HttpRequest.BodyPublishers.noBody()
+                : HttpRequest.BodyPublishers.ofByteArray(request.body());
+        var builder = HttpRequest.newBuilder(URI.create(request.url()))
                 .timeout(timeout)
-                .POST(HttpRequest.BodyPublishers.ofByteArray(body));
-        headers.forEach(builder::header);
+                .method(request.method(), body);
+        request.headers().forEach(builder::header);
         return builder.build();
     }
 
