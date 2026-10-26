@@ -58,7 +58,7 @@ final class ResponseDecoder {
                     optionalDouble(node, "confidence"));
             case Score s -> new ScoreAnswer(
                     requireDouble(node, "score"),
-                    doubleList(node.get("probabilities")),
+                    levelProbabilities(node.get("probabilities")),
                     stringMap(node.get("legend")),
                     optionalDouble(node, "confidence"));
             case Noul n -> new NoulAnswer(requireDouble(node, "noul"));
@@ -109,12 +109,31 @@ final class ResponseDecoder {
         return out;
     }
 
-    private List<Double> doubleList(Object node) {
+    /** Score probabilities: an array, or (as the API sends them) an object keyed by level number. */
+    private List<Double> levelProbabilities(Object node) {
         var out = new ArrayList<Double>();
         if (node instanceof List<?> list) {
             list.forEach(value -> out.add(number(value)));
+        } else if (node instanceof Map<?, ?> map) {
+            map.forEach((key, value) -> put(out, level(key), number(value)));
         }
         return out;
+    }
+
+    // A level the service omits reads as 0, so indexes always line up with levels.
+    private static void put(List<Double> levels, int level, double probability) {
+        while (levels.size() <= level) {
+            levels.add(0.0);
+        }
+        levels.set(level, probability);
+    }
+
+    private int level(Object key) {
+        String text = String.valueOf(key);
+        if (text.length() == 1 && text.charAt(0) >= '0' && text.charAt(0) <= '9') {
+            return text.charAt(0) - '0';
+        }
+        throw malformed("expected a score level number but got \"" + key + "\"");
     }
 
     private static Map<String, String> stringMap(Object node) {
