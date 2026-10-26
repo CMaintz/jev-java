@@ -2,6 +2,7 @@ package io.github.cmaintz.jev;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -15,16 +16,17 @@ import java.util.concurrent.CompletableFuture;
 public final class JevClient {
 
     private static final String ENV_KEY = "TYPESAFE_API_KEY";
-    private static final String PATH = "/v1/systemone";
+    private static final String SYSTEM_ONE_PATH = "/v1/systemone";
+    private static final String MODELS_PATH = "/v1/models";
 
     private final String model;
-    private final String endpoint;
+    private final String baseUrl;
     private final String authorization;
     private final RetryingSender sender;
 
     private JevClient(Builder builder) {
         this.model = builder.model;
-        this.endpoint = endpoint(builder.baseUrl);
+        this.baseUrl = baseUrl(builder.baseUrl);
         this.authorization = "Bearer " + resolveApiKey(builder.apiKey);
         this.sender = new RetryingSender(
                 builder.transport != null ? builder.transport : new JdkHttpTransport(builder.timeout),
@@ -32,13 +34,14 @@ public final class JevClient {
                 builder.delays);
     }
 
-    private static String endpoint(String baseUrl) {
-        String url = baseUrl.replaceAll("/+$", "") + PATH;
-        if (!isHttpUrl(url)) {
+    /** The base URL without trailing slashes, so a proxy path prefix is kept in front of each endpoint. */
+    private static String baseUrl(String configured) {
+        String base = configured.replaceAll("/+$", "");
+        if (!isHttpUrl(base + SYSTEM_ONE_PATH)) {
             throw new IllegalArgumentException(
-                    "baseUrl must be an absolute http(s) URL without a query or fragment: " + baseUrl);
+                    "baseUrl must be an absolute http(s) URL without a query or fragment: " + configured);
         }
-        return url;
+        return base;
     }
 
     private static boolean isHttpUrl(String url) {
@@ -114,6 +117,31 @@ public final class JevClient {
                 .thenApply(body -> ResponseDecoder.decode(body, questions));
     }
 
+    /**
+     * The models and aliases this account can use. Pass a {@link ModelInfo#name()} as the
+     * model. Retried and mapped to exceptions like {@link #systemOne(Object, Map)}.
+     *
+     * @return the available models, in the order the service lists them
+     * @throws JevException on any network, HTTP, or response-format failure
+     */
+    public List<ModelInfo> models() {
+        return ModelsDecoder.decode(sender.send(modelsRequest()));
+    }
+
+    /**
+     * Asynchronous variant of {@link #models()}.
+     *
+     * @return a future completing with the available models, or exceptionally with the
+     *     {@link JevException} that {@link #models()} would throw
+     */
+    public CompletableFuture<List<ModelInfo>> modelsAsync() {
+        return sender.sendAsync(modelsRequest()).thenApply(ModelsDecoder::decode);
+    }
+
+    private HttpTransport.Request modelsRequest() {
+        return new HttpTransport.Request("GET", baseUrl + MODELS_PATH, Map.of("Authorization", authorization), null);
+    }
+
     private HttpTransport.Request systemOneRequest(Object state, Map<String, Question> questions) {
         Objects.requireNonNull(state, "state");
         Objects.requireNonNull(questions, "questions");
@@ -122,7 +150,7 @@ public final class JevClient {
         }
         byte[] body = RequestEncoder.encode(model, state, questions);
         var headers = Map.of("Authorization", authorization, "Content-Type", "application/json");
-        return new HttpTransport.Request("POST", endpoint, headers, body);
+        return new HttpTransport.Request("POST", baseUrl + SYSTEM_ONE_PATH, headers, body);
     }
 
     /** Fluent builder for {@link JevClient}. */
