@@ -1,17 +1,23 @@
 package io.github.cmaintz.jev;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Map;
 
 /**
  * Minimal JSON serializer for the closed set of value types this SDK emits: {@code Map}
  * (object), {@code Iterable} (array), {@code String}, {@code Number}, {@code Boolean},
- * and {@code null}. State passed to the client must be composed of these.
+ * and {@code null}, plus {@link Image} and {@link TextWithImages}, which are written as
+ * their reference text and collected. State passed to the client must be composed of these.
  */
 final class JsonWriter {
 
     private final StringBuilder sb = new StringBuilder();
+    private final Collection<Image> images;
 
-    private JsonWriter() {}
+    private JsonWriter(Collection<Image> images) {
+        this.images = images;
+    }
 
     /**
      * Serialize {@code value} to a JSON string.
@@ -19,7 +25,12 @@ final class JsonWriter {
      * @throws IllegalArgumentException on an unsupported type or a non-finite number
      */
     static String write(Object value) {
-        var writer = new JsonWriter();
+        return write(value, new ArrayList<>());
+    }
+
+    /** Serialize {@code value}, adding every image it holds to {@code images}. */
+    static String write(Object value, Collection<Image> images) {
+        var writer = new JsonWriter(images);
         writer.writeValue(value);
         return writer.sb.toString();
     }
@@ -32,6 +43,14 @@ final class JsonWriter {
             case Number n -> writeNumber(n);
             case Map<?, ?> m -> writeObject(m);
             case Iterable<?> it -> writeArray(it);
+            case Image image -> {
+                images.add(image);
+                writeString(image.reference());
+            }
+            case TextWithImages text -> {
+                images.addAll(text.images());
+                writeString(text.text());
+            }
             default -> throw new IllegalArgumentException(
                     "Unsupported JSON value type: " + value.getClass().getName());
         }

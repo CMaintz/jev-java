@@ -151,9 +151,12 @@ public final class JevThresholds {
         if (definitions == null || !definitions.containsKey(id)) {
             return Optional.empty();
         }
+        // Image references are random per image, so a question with images can never match
+        // its recorded definition; say nothing rather than always warning.
+        var images = new ArrayList<Image>();
+        String json = JsonWriter.write(RequestEncoder.questionMap(question), images);
         // Round-trip through JSON so an Integer 2 we send equals the 2.0 read back from the file.
-        Object sent = JsonParser.parse(JsonWriter.write(RequestEncoder.questionMap(question)));
-        if (sent.equals(definitions.get(id))) {
+        if (!images.isEmpty() || JsonParser.parse(json).equals(definitions.get(id))) {
             return Optional.empty();
         }
         return Optional.of(id + " was reworded since it was measured; re-measure.");

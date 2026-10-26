@@ -7,7 +7,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Validates and freezes question instructions and criteria. Each is text, or structured
+ * Validates and freezes question instructions and criteria. Each is text, an {@link Image},
+ * {@link TextWithImages}, or structured
  * JSON built from {@link Map}s (text keys) and {@link List}s holding text, numbers,
  * booleans, nulls and further maps and lists. Structured values are deep-copied into
  * unmodifiable collections so a caller's later changes never reach the question.
@@ -19,7 +20,7 @@ final class Prompts {
 
     private Prompts() {}
 
-    /** Instructions: non-blank text, or a frozen copy of a non-empty Map or List. */
+    /** Instructions: non-blank text, an image, text with images, or a frozen copy of a non-empty Map or List. */
     static Object require(Object value, String name) {
         return require(value, name, 0);
     }
@@ -41,10 +42,13 @@ final class Prompts {
         if (value instanceof String text) {
             return Preconditions.requireText(text, name);
         }
+        if (value instanceof Image || value instanceof TextWithImages) {
+            return value;
+        }
         if ((value instanceof Map<?, ?> map && !map.isEmpty()) || (value instanceof List<?> list && !list.isEmpty())) {
             return freeze(value, name, depth);
         }
-        throw new IllegalArgumentException(name + " must be text, or a non-empty Map or List.");
+        throw new IllegalArgumentException(name + " must be text, an Image, or a non-empty Map or List.");
     }
 
     private static Object freeze(Object value, String name, int depth) {
@@ -52,6 +56,8 @@ final class Prompts {
             case null -> null;
             case String text -> text;
             case Boolean flag -> flag;
+            case Image image -> image;
+            case TextWithImages text -> text;
             case Number number -> immutableNumber(number, name);
             case Map<?, ?> map -> freezeMap(map, name, deeper(depth, name));
             case List<?> list -> freezeList(list, name, deeper(depth, name));

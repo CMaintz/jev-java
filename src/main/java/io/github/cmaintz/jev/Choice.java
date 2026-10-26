@@ -10,8 +10,8 @@ import java.util.Objects;
  * gives a probability for every option; its confidence summarizes how peaked that
  * distribution is. Add a no-match option when nothing may fit.
  *
- * <p>Instructions and each option's description are text, or structured JSON as a
- * {@code Map} or {@code List}; see {@link Question#instructions()}.
+ * <p>Instructions and each option's description are text, an {@link Image}, {@link TextWithImages}, or structured JSON as a {@code Map} or
+ * {@code List}; see {@link Question#instructions()}.
  *
  * @param instructions what to decide, e.g. "Which team should handle this"
  * @param criteria option name to its description; 1 to 255 options, sent in the map's

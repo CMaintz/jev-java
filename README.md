@@ -202,6 +202,26 @@ State may be a `String`, or any tree of `Map` / `List` / `String` / `Number` /
 `Boolean` / `null`; a `Map` gives exact control over field names. Keep the API key
 server-side. The client is thread-safe: build one and reuse it.
 
+## Images
+
+Put an `Image` anywhere text can go: as the state, inside it, as a question's
+instructions, or as a criteria value. Use `TextWithImages` to place one mid-sentence. The
+client sends each image once as a file part and turns on TypeSafe's images header.
+
+```java
+Image door = Image.fromFile(Path.of("door-camera.jpg"));
+Image poster = Image.png(posterBytes);
+var questions = Map.<String, Question>of(
+        "person", new Noul("Is there a person in `door`?"),
+        "same", new Noul(TextWithImages.of("Is the dog in `door` the dog in ", poster, "?")));
+client.systemOne(Map.of("door", door), questions);
+```
+
+Images are experimental on TypeSafe's side. The API rejects, rather than resizes, images
+outside its limits: PNG or still JPEG, 280 to 1568 pixels per side, 16 MiB per file and
+32 MiB per request. Rotate pixels upright first, since EXIF orientation is dropped. See
+[TypeSafe's image docs](https://docs.typesafe.ai/images).
+
 ## Box questions
 
 A `Box` finds where something is in an image and answers with its edges as fractions of

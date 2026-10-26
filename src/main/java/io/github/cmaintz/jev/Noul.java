@@ -5,7 +5,7 @@ package io.github.cmaintz.jev;
  * strong yes, near 0 a strong no, near 0.5 genuinely uncertain. A Noul carries no
  * separate confidence. Use one Noul per label when several labels may apply at once.
  *
- * <p>Instructions and the glosses are text, or structured JSON as a {@code Map} or
+ * <p>Instructions and the glosses are text, an {@link Image}, {@link TextWithImages}, or structured JSON as a {@code Map} or
  * {@code List}; see {@link Question#instructions()}.
  *
  * @param instructions the condition to judge, e.g. "Does the customer request a refund?"
