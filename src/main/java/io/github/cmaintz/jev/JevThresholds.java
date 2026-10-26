@@ -122,7 +122,7 @@ public final class JevThresholds {
 
     private Gate gateFor(List<String> ids) {
         if (ids.isEmpty()) {
-            throw new JevThresholdsException("Nothing to gate on (every question is a noul).");
+            throw new JevThresholdsException("Nothing to gate on (no choice or score question).");
         }
         if (ids.size() == 1) {
             return questionGate(ids.get(0));
