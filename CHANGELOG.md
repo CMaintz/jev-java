@@ -6,6 +6,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Added
 
+- Typed `JevBadRequestException` (400), `JevPayloadTooLargeException` (413) and `JevServerException` (other 5xx). `408` and every `5xx` are now retried alongside `429`, and a `retry-after-ms` header is honored, matching TypeSafe's own SDKs.
 - **v0.1:** `JevClient` for TypeSafe AI's Jev System One model. `systemOne(state, questions)` sends a state plus typed questions and returns typed answers with calibrated confidence; `systemOneAsync` returns a `CompletableFuture` that never holds a thread while waiting (it uses `HttpClient.sendAsync` and schedules retry backoff on a delayed executor). `HttpTransport` has a default `sendAsync` that runs a blocking `send` on a virtual thread for custom transports.
 - Three question primitives as a sealed `Question` hierarchy: `Choice` (map criteria, 1 to 255 options, sent in order), `Score` (1 to 10 ordered levels), `Noul` (yes/no), validated on construction. Instructions, criteria and Noul glosses are text or structured JSON (`Map`s and `List`s), deep-copied on construction; a structured Score level reads back in `legend()` as compact JSON.
 - A matching sealed `Answer` hierarchy (`ChoiceAnswer`, `ScoreAnswer`, `NoulAnswer`), shaped by the question asked under each id. Typed accessors `SystemOneResponse.choice/score/noul(id)`, type-filtered views `choices()` / `scores()` / `nouls()`, and gating helpers `CalibratedAnswer.isConfident(threshold)` (Choice and Score) / `NoulAnswer.isTrue(threshold)`.

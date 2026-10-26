@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
@@ -12,9 +11,11 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Sends a request body through an {@link HttpTransport}, retrying {@code 429} and
- * {@code 529} with exponential backoff plus jitter. A {@code Retry-After} header given
- * in seconds takes precedence over the computed delay. Every delay is capped. The
+ * Sends a request body through an {@link HttpTransport}, retrying {@code 408},
+ * {@code 429} and every {@code 5xx} (including {@code 529}) with exponential backoff plus
+ * jitter, as TypeSafe's own SDKs do. A {@code retry-after-ms} header, else a
+ * {@code Retry-After} given in seconds, takes precedence over the computed delay. Every
+ * delay is capped. The
  * blocking path sleeps between attempts; the async path schedules the next attempt
  * without holding a thread.
  */
@@ -42,7 +43,6 @@ final class RetryingSender {
         }
     };
 
-    private static final Set<Integer> RETRYABLE = Set.of(429, 529);
     private static final Duration BASE_DELAY = Duration.ofMillis(500);
     private static final Duration MAX_DELAY = Duration.ofSeconds(30);
     private static final long MAX_JITTER_MILLIS = 250;
@@ -107,7 +107,11 @@ final class RetryingSender {
     }
 
     private boolean shouldRetry(HttpTransport.Response response, int attempt) {
-        return RETRYABLE.contains(response.status()) && attempt < maxRetries;
+        return isRetryable(response.status()) && attempt < maxRetries;
+    }
+
+    private static boolean isRetryable(int status) {
+        return status == 408 || status == 429 || status >= 500;
     }
 
     private HttpTransport.Response attempt(byte[] body) {
@@ -142,15 +146,18 @@ final class RetryingSender {
     }
 
     private static Optional<Duration> retryAfter(HttpTransport.Response response) {
-        return response.header("Retry-After").flatMap(RetryingSender::parseSeconds);
+        return response.header("retry-after-ms")
+                .flatMap(ms -> parseCount(ms).map(Duration::ofMillis))
+                .or(() -> response.header("Retry-After")
+                        .flatMap(s -> parseCount(s).map(Duration::ofSeconds)));
     }
 
-    private static Optional<Duration> parseSeconds(String value) {
+    private static Optional<Long> parseCount(String value) {
         try {
-            long seconds = Long.parseLong(value.trim());
-            return seconds >= 0 ? Optional.of(Duration.ofSeconds(seconds)) : Optional.empty();
+            long count = Long.parseLong(value.trim());
+            return count >= 0 ? Optional.of(count) : Optional.empty();
         } catch (NumberFormatException e) {
-            return Optional.empty(); // an HTTP-date; fall back to the computed backoff
+            return Optional.empty(); // e.g. an HTTP-date; fall back to the computed backoff
         }
     }
 

@@ -60,11 +60,45 @@ class RetryTest {
         var invalid = new StubTransport().enqueue(422, "{}");
         assertThrows(JevValidationException.class, () -> invalid.client(3).systemOne("s", ONE));
 
-        var error = assertThrows(
-                JevException.class,
-                () -> new StubTransport().enqueue(500, "boom").client(3).systemOne("s", ONE));
-        assertEquals(500, error.statusCode());
-        assertEquals("boom", error.responseBody());
+        var badRequest = new StubTransport().enqueue(400, "{\"detail\":\"max_tokens_exceeded\"}");
+        var tooLong = assertThrows(
+                JevBadRequestException.class, () -> badRequest.client(3).systemOne("s", ONE));
+        assertEquals(1, badRequest.calls);
+        assertEquals(400, tooLong.statusCode());
+
+        var tooLarge = new StubTransport().enqueue(413, "{}");
+        assertThrows(JevPayloadTooLargeException.class, () -> tooLarge.client(3).systemOne("s", ONE));
+        assertEquals(1, tooLarge.calls);
+
+        var forbidden = new StubTransport().enqueue(403, "nope");
+        var error = assertThrows(JevException.class, () -> forbidden.client(3).systemOne("s", ONE));
+        assertEquals(1, forbidden.calls);
+        assertEquals(403, error.statusCode());
+        assertEquals("nope", error.responseBody());
+    }
+
+    @Test
+    void serverErrorsAndRequestTimeoutsAreRetried() {
+        var transport =
+                new StubTransport().enqueue(500, "{}").enqueue(503, "{}").enqueue(408, "{}");
+        transport.client(3).systemOne("s", ONE);
+        assertEquals(4, transport.calls);
+
+        var down = new StubTransport().enqueue(502, "bad gateway").enqueue(502, "bad gateway");
+        var error = assertThrows(JevServerException.class, () -> down.client(1).systemOne("s", ONE));
+        assertEquals(2, down.calls);
+        assertEquals(502, error.statusCode());
+        assertEquals("bad gateway", error.responseBody());
+    }
+
+    @Test
+    void retryAfterMillisecondsTakesPrecedence() {
+        var response = new HttpTransport.Response(429, "{}", Map.of("retry-after-ms", "1500", "Retry-After", "9"));
+        var delay = RetryingSender.delayFor(response, 0);
+
+        assertTrue(
+                delay.compareTo(Duration.ofMillis(1500)) >= 0 && delay.compareTo(Duration.ofMillis(1750)) < 0,
+                delay::toString);
     }
 
     @Test
