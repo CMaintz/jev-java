@@ -12,7 +12,7 @@ import java.util.concurrent.Executor;
 
 /**
  * A test transport that records the last request and replays a scripted queue of
- * responses. Injected via {@code Builder.transport} so tests never touch the network.
+ * responses. Injected via {@code JevClientBuilder.transport} so tests never touch the network.
  */
 final class StubTransport implements HttpTransport {
 
