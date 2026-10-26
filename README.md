@@ -199,6 +199,17 @@ State may be a `String`, or any tree of `Map` / `List` / `String` / `Number` /
 `Boolean` / `null`; a `Map` gives exact control over field names. Keep the API key
 server-side. The client is thread-safe: build one and reuse it.
 
+## Per-call options
+
+Pass `SystemOneOptions` to change one call: another model (such as `jev-preview`, or a
+pinned version like `jev-1.14.0`), or long context, which raises both context limits to
+262k tokens. Long context is slower and less accurate, so turn it on only where needed.
+
+```java
+var options = SystemOneOptions.DEFAULT.withModel("jev-preview").withLongContext(true);
+SystemOneResponse response = client.systemOne(contract, questions, options);
+```
+
 ## Listing models
 
 `client.models()` (or `modelsAsync()`) returns the models and aliases your account can
