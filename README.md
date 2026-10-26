@@ -95,8 +95,22 @@ switch (response.get(id)) {
 ```
 
 `Choice` criteria is a map of option to description (1 to 255 options). `Score` criteria
-is an ordered list of 2 to 10 level descriptions, low to high. The model cannot pick an
+is an ordered list of 1 to 10 level descriptions, low to high. The model cannot pick an
 option you did not give it, so include a no-match option when nothing may fit.
+
+Instructions, option descriptions, levels and Noul glosses can also be structured JSON,
+built from `Map`s and `List`s, when definitions, contrasts or examples make the question
+clearer. They are validated and deep-copied when the question is built:
+
+```java
+new Choice(
+    Map.of("task", "Route this ticket to a team", "ignore", List.of("greetings", "signatures")),
+    Map.of(
+        "billing", Map.of("covers", "charges and refunds", "examples", List.of("charged twice")),
+        "tech", "bugs and outages"));
+```
+
+A structured Score level comes back in `legend()` as compact JSON text.
 
 ## Confidence
 

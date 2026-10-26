@@ -5,15 +5,20 @@ package io.github.cmaintz.jev;
  * strong yes, near 0 a strong no, near 0.5 genuinely uncertain. A Noul carries no
  * separate confidence. Use one Noul per label when several labels may apply at once.
  *
+ * <p>Instructions and the glosses are text, or structured JSON as a {@code Map} or
+ * {@code List}; see {@link Question#instructions()}.
+ *
  * @param instructions the condition to judge, e.g. "Does the customer request a refund?"
  * @param whenTrue optional description of what a "yes" means (wire {@code criteria.true}); may be null
  * @param whenFalse optional description of what a "no" means (wire {@code criteria.false}); may be null
  */
-public record Noul(String instructions, String whenTrue, String whenFalse) implements Question {
+public record Noul(Object instructions, Object whenTrue, Object whenFalse) implements Question {
 
-    /** Validates the instructions. */
+    /** Validates the instructions and glosses, freezing structured ones. */
     public Noul {
-        Preconditions.requireText(instructions, "instructions");
+        instructions = Prompts.require(instructions, "instructions");
+        whenTrue = Prompts.optionalCriterion(whenTrue, "whenTrue");
+        whenFalse = Prompts.optionalCriterion(whenFalse, "whenFalse");
     }
 
     /**
@@ -21,7 +26,7 @@ public record Noul(String instructions, String whenTrue, String whenFalse) imple
      *
      * @param instructions the condition to judge
      */
-    public Noul(String instructions) {
+    public Noul(Object instructions) {
         this(instructions, null, null);
     }
 }

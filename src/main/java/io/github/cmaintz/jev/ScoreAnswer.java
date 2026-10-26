@@ -11,7 +11,8 @@ import java.util.Objects;
  *
  * @param score position on the scale; may fall between two levels
  * @param probabilities probability per level, ordered low to high
- * @param legend level index (as text, e.g. {@code "0"}) to its description
+ * @param legend level index (as text, e.g. {@code "0"}) to its description; a structured
+ *     level is given as compact JSON text
  * @param confidence distribution peakedness in [0, 1]; NaN if the service omitted it
  */
 public record ScoreAnswer(double score, List<Double> probabilities, Map<String, String> legend, double confidence)

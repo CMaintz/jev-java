@@ -163,6 +163,17 @@ class ThresholdsTest {
     }
 
     @Test
+    void aStructuredQuestionMatchesItsDefinitionDespiteNumberTypes() {
+        var structured = new Choice(Map.of("task", "Which team?", "max", 2), Map.of("tech", "Tech"));
+        var definition = ",\"definitions\":{\"team\":{\"type\":\"choice\","
+                + "\"instructions\":{\"task\":\"Which team?\",\"max\":2},\"criteria\":{\"tech\":\"Tech\"}}}";
+
+        var gate = JevThresholds.parse(file("\"team\":" + GATE, definition)).pick(questions("team", structured));
+
+        assertEquals(List.of(), gate.warnings());
+    }
+
+    @Test
     void ignoresUnknownKeysAndUnusableDefinitions() {
         JevThresholds thresholds =
                 JevThresholds.parse(file("\"team\":" + GATE, ",\"future\":{\"x\":[1]},\"definitions\":[]"));

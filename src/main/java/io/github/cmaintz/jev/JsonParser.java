@@ -12,8 +12,11 @@ import java.util.Map;
  */
 final class JsonParser {
 
-    /** Deepest nesting accepted, as System.Text.Json's default; deeper input would overflow the stack. */
-    private static final int MAX_DEPTH = 64;
+    /**
+     * Deepest nesting accepted; deeper input would overflow the stack. Twice the API's 64
+     * per field, since a legend or a recorded definition sits a few levels below the root.
+     */
+    private static final int MAX_DEPTH = 128;
 
     private final String text;
     private int pos;

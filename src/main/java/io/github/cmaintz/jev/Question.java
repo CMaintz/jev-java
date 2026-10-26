@@ -9,10 +9,11 @@ package io.github.cmaintz.jev;
 public sealed interface Question permits Noul, Choice, Score {
 
     /**
-     * The judgment to make, in natural language. Backticked paths such as
-     * {@code ticket.body} reference nested state.
+     * The judgment to make: natural-language text, or structured JSON (a {@code Map} or
+     * {@code List}) when definitions, contrasts or examples make it clearer. Backticked
+     * paths such as {@code ticket.body} reference nested state.
      *
-     * @return the instructions
+     * @return the instructions, as text or an unmodifiable Map or List
      */
-    String instructions();
+    Object instructions();
 }

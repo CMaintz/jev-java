@@ -151,7 +151,9 @@ public final class JevThresholds {
         if (definitions == null || !definitions.containsKey(id)) {
             return Optional.empty();
         }
-        if (RequestEncoder.questionMap(question).equals(definitions.get(id))) {
+        // Round-trip through JSON so an Integer 2 we send equals the 2.0 read back from the file.
+        Object sent = JsonParser.parse(JsonWriter.write(RequestEncoder.questionMap(question)));
+        if (sent.equals(definitions.get(id))) {
             return Optional.empty();
         }
         return Optional.of(id + " was reworded since it was measured; re-measure.");

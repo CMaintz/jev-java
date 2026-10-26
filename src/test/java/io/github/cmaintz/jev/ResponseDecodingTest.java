@@ -71,6 +71,19 @@ class ResponseDecodingTest {
     }
 
     @Test
+    void writesAStructuredLegendLevelAsCompactJson() {
+        var answer = decode(
+                        "{\"answers\":{\"anger\":{\"score\":1,"
+                                + "\"legend\":{\"0\":\"calm\",\"1\":{\"level\": \"cross\", \"max\": 2, \"signs\": [\"caps\"]}}}}}")
+                .score("anger");
+
+        assertEquals("calm", answer.legend().get("0"));
+        assertEquals(
+                "{\"level\":\"cross\",\"max\":2,\"signs\":[\"caps\"]}",
+                answer.legend().get("1"));
+    }
+
+    @Test
     void readsNoulAndTreatsMissingUsageAsNull() {
         var response = decode("{\"answers\":{\"refund\":{\"noul\":0.85}}}");
 
