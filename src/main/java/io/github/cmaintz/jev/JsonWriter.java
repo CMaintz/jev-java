@@ -41,7 +41,11 @@ final class JsonWriter {
         if ((n instanceof Double d && !Double.isFinite(d)) || (n instanceof Float f && !Float.isFinite(f))) {
             throw new IllegalArgumentException("JSON cannot represent the number " + n);
         }
-        sb.append(n);
+        // A whole double is written without ".0", so a 2 that came back parsed as 2.0 reads as sent.
+        boolean whole = (n instanceof Double || n instanceof Float)
+                && n.doubleValue() == Math.rint(n.doubleValue())
+                && Math.abs(n.doubleValue()) < 1e15;
+        sb.append(whole ? Long.toString(n.longValue()) : n.toString());
     }
 
     private void writeObject(Map<?, ?> map) {

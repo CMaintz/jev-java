@@ -59,7 +59,7 @@ final class ResponseDecoder {
             case Score s -> new ScoreAnswer(
                     requireDouble(node, "score"),
                     levelProbabilities(node.get("probabilities")),
-                    stringMap(node.get("legend")),
+                    legend(node.get("legend")),
                     optionalDouble(node, "confidence"));
             case Noul n -> new NoulAnswer(requireDouble(node, "noul"));
         };
@@ -136,10 +136,12 @@ final class ResponseDecoder {
         throw malformed("expected a score level number but got \"" + key + "\"");
     }
 
-    private static Map<String, String> stringMap(Object node) {
+    /** Score legend: text levels as they are, structured levels as compact JSON. */
+    private static Map<String, String> legend(Object node) {
         var out = new LinkedHashMap<String, String>();
         if (node instanceof Map<?, ?> map) {
-            map.forEach((key, value) -> out.put(String.valueOf(key), String.valueOf(value)));
+            map.forEach((key, value) ->
+                    out.put(String.valueOf(key), value instanceof String text ? text : JsonWriter.write(value)));
         }
         return out;
     }
