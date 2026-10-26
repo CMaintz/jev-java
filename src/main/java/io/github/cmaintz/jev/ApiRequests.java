@@ -1,6 +1,7 @@
 package io.github.cmaintz.jev;
 
 import java.net.URI;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -64,14 +65,25 @@ final class ApiRequests {
     }
 
     /** {@code POST /v1/systemone} for {@code questions} about {@code state}; validates both first. */
-    HttpTransport.Request systemOne(Object state, Map<String, Question> questions) {
+    HttpTransport.Request systemOne(Object state, Map<String, Question> questions, SystemOneOptions options) {
         Objects.requireNonNull(state, "state");
         Objects.requireNonNull(questions, "questions");
+        Objects.requireNonNull(options, "options");
         if (questions.isEmpty()) {
             throw new IllegalArgumentException("At least one question is required.");
         }
-        byte[] body = RequestEncoder.encode(model, state, questions);
-        var headers = Map.of("Authorization", authorization, "Content-Type", "application/json");
-        return new HttpTransport.Request("POST", baseUrl + SYSTEM_ONE_PATH, headers, body);
+        String callModel = options.model() != null ? options.model() : model;
+        byte[] body = RequestEncoder.encode(callModel, state, questions);
+        return new HttpTransport.Request("POST", baseUrl + SYSTEM_ONE_PATH, systemOneHeaders(options), body);
+    }
+
+    private Map<String, String> systemOneHeaders(SystemOneOptions options) {
+        var headers = new HashMap<String, String>();
+        headers.put("Authorization", authorization);
+        headers.put("Content-Type", "application/json");
+        if (options.longContext()) {
+            headers.put("TypeSafe-Danger-Zone-Long-Context", "true");
+        }
+        return headers;
     }
 }

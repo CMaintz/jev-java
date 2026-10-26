@@ -54,7 +54,22 @@ public final class JevClient {
      * @throws JevException on any network, HTTP, or response-format failure
      */
     public SystemOneResponse systemOne(Object state, Map<String, Question> questions) {
-        String body = sender.send(requests.systemOne(state, questions));
+        return systemOne(state, questions, SystemOneOptions.DEFAULT);
+    }
+
+    /**
+     * {@link #systemOne(Object, Map)} with per-call settings, such as another model or
+     * long context.
+     *
+     * @param state the input to judge
+     * @param questions the questions to ask, keyed by an id of your choosing
+     * @param options settings for this call
+     * @return the typed answers, keyed by question id
+     * @throws IllegalArgumentException if there are no questions or the state holds an unsupported type
+     * @throws JevException on any network, HTTP, or response-format failure
+     */
+    public SystemOneResponse systemOne(Object state, Map<String, Question> questions, SystemOneOptions options) {
+        String body = sender.send(requests.systemOne(state, questions, options));
         return ResponseDecoder.decode(body, questions);
     }
 
@@ -69,7 +84,22 @@ public final class JevClient {
      * @throws IllegalArgumentException immediately, for the same invalid arguments as the blocking call
      */
     public CompletableFuture<SystemOneResponse> systemOneAsync(Object state, Map<String, Question> questions) {
-        return sender.sendAsync(requests.systemOne(state, questions))
+        return systemOneAsync(state, questions, SystemOneOptions.DEFAULT);
+    }
+
+    /**
+     * Asynchronous variant of {@link #systemOne(Object, Map, SystemOneOptions)}.
+     *
+     * @param state the input to judge
+     * @param questions the questions to ask, keyed by an id of your choosing
+     * @param options settings for this call
+     * @return a future completing with the typed answers, or exceptionally with the
+     *     {@link JevException} that the blocking call would throw
+     * @throws IllegalArgumentException immediately, for the same invalid arguments as the blocking call
+     */
+    public CompletableFuture<SystemOneResponse> systemOneAsync(
+            Object state, Map<String, Question> questions, SystemOneOptions options) {
+        return sender.sendAsync(requests.systemOne(state, questions, options))
                 .thenApply(body -> ResponseDecoder.decode(body, questions));
     }
 
