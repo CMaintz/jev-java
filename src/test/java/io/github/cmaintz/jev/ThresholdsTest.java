@@ -83,7 +83,7 @@ class ThresholdsTest {
         JevThresholds noComposite = JevThresholds.parse(file("\"team\":" + GATE, ""));
         var other = new Choice("Which product?", Map.of("a", "A"));
 
-        assertMessage("every question is a noul", () -> fixture().pick(questions("urgent", URGENT)));
+        assertMessage("no choice or score question", () -> fixture().pick(questions("urgent", URGENT)));
         assertMessage("no gate for \"product\"", () -> fixture().pick(questions("product", other)));
         assertMessage("row gate unstable", () -> noComposite.pick(questions("team", TEAM, "product", other)));
     }
