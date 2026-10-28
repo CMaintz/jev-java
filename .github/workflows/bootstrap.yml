@@ -10,8 +10,7 @@ jobs:
       app_private_key: ${{ secrets.BOOTSTRAP_APP_PRIVATE_KEY }}
     with:
       working_directory: '.'
-      # No habit-hooks-java plugin is wired; structural smells come from the language-
-      # independent generic sensor (file-length + jscpd). See .habit-hooks/config.toml.
-      habit_hooks_plugin: 'habit-hooks-generic'
+      # PMD comes from mise.toml's setup:pmd postinstall, which `mise install` runs here.
+      habit_hooks_plugin: 'habit-hooks-java'
       app_client_id: ${{ vars.BOOTSTRAP_APP_CLIENT_ID }}
     permissions: { contents: write, pull-requests: write }

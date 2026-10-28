@@ -35,7 +35,7 @@ final class JsonWriter {
         return writer.sb.toString();
     }
 
-    private void writeValue(Object value) {
+    private void writeValue(Object value) { // foundry-allow-smell: one arm per JSON type, nothing to split
         switch (value) {
             case null -> sb.append("null");
             case String s -> writeString(s);
