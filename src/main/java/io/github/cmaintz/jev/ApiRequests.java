@@ -71,25 +71,33 @@ final class ApiRequests {
 
     /** {@code POST /v1/systemone} for {@code questions} about {@code state}; validates both first. */
     HttpTransport.Request systemOne(Object state, Map<String, Question> questions, SystemOneOptions options) {
-        Objects.requireNonNull(state, "state");
-        Objects.requireNonNull(questions, "questions");
-        Objects.requireNonNull(options, "options");
-        if (questions.isEmpty()) {
-            throw new IllegalArgumentException("At least one question is required.");
-        }
+        requireArguments(state, questions, options);
         String callModel = options.model() != null ? options.model() : model;
         var encoded = RequestEncoder.encode(callModel, state, questions);
         var headers = systemOneHeaders(options);
         if (!encoded.images().isEmpty() || questions.values().stream().anyMatch(Box.class::isInstance)) {
             headers.put(IMAGES_HEADER, "true");
         }
-        if (encoded.images().isEmpty()) {
-            headers.put("Content-Type", "application/json");
-            return post(encoded.json().getBytes(StandardCharsets.UTF_8), headers);
+        var body = body(encoded);
+        headers.put("Content-Type", body.contentType());
+        return post(body.bytes(), headers);
+    }
+
+    private static void requireArguments(Object state, Map<String, Question> questions, SystemOneOptions options) {
+        Objects.requireNonNull(state, "state");
+        Objects.requireNonNull(questions, "questions");
+        Objects.requireNonNull(options, "options");
+        if (questions.isEmpty()) {
+            throw new IllegalArgumentException("At least one question is required.");
         }
-        var multipart = Multipart.of(encoded.json(), encoded.images());
-        headers.put("Content-Type", multipart.contentType());
-        return post(multipart.bytes(), headers);
+    }
+
+    /** Plain JSON, or multipart when there are images to send as file parts. */
+    private static Multipart.Body body(RequestEncoder.Encoded encoded) {
+        if (encoded.images().isEmpty()) {
+            return new Multipart.Body(encoded.json().getBytes(StandardCharsets.UTF_8), "application/json");
+        }
+        return Multipart.of(encoded.json(), encoded.images());
     }
 
     /** Compressed once here, so every retry resends the same bytes. */

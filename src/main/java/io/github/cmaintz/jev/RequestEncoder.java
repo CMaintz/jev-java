@@ -29,10 +29,11 @@ final class RequestEncoder {
         root.put("questions", questionsMap(questions));
         var found = new LinkedHashSet<Image>();
         String json = JsonWriter.write(root, found);
-        if (found.isEmpty()) {
-            return new Encoded(json, List.of());
-        }
-        List<Image> images = List.copyOf(found);
+        return found.isEmpty() ? new Encoded(json, List.of()) : withAssets(root, List.copyOf(found));
+    }
+
+    /** The images are only known once the body is written, so it is written again with its assets. */
+    private static Encoded withAssets(Map<String, Object> root, List<Image> images) {
         root.put("assets", assets(images));
         return new Encoded(JsonWriter.write(root), images);
     }
@@ -66,10 +67,10 @@ final class RequestEncoder {
 
     private static String wireType(Question question) {
         return switch (question) {
-            case Choice c -> "choice";
-            case Score s -> "score";
-            case Noul n -> "noul";
-            case Box b -> "box";
+            case Choice ignored -> "choice";
+            case Score ignored -> "score";
+            case Noul ignored -> "noul";
+            case Box ignored -> "box";
         };
     }
 
@@ -78,7 +79,7 @@ final class RequestEncoder {
             case Choice choice -> choice.criteria();
             case Score score -> score.criteria();
             case Noul noul -> noulCriteria(noul);
-            case Box box -> null;
+            case Box ignored -> null;
         };
     }
 
