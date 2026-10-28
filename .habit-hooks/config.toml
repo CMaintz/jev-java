@@ -1,11 +1,20 @@
-# No habit-hooks-java (PMD) plugin is wired here - this single-package library keeps
-# the gate self-contained. Structural smells come from the language-independent
-# `generic` plugin (file-length + jscpd duplication); style is enforced by Spotless
-# in `mise run lint`.
-plugins = ["generic"]
+# Structural smells: the Java plugin wraps PMD (oversized-function, high-complexity,
+# unused-variable and the rest), and `generic` adds file-length and jscpd duplication.
+# Style is enforced by Spotless in `mise run lint`. PMD comes from mise (setup:pmd).
+plugins = ["java", "generic"]
 
 # Tests are not smell-scanned (language-agnostic principle - see README).
 files = ["**/*.java", "!**/src/test/**", "!**/build/**"]
+
+# -R names Foundry's tuned ruleset, so a missing one fails loudly instead of falling
+# back to PMD's bundled minimum of 4 parameters. A `// foundry-allow-smell: <reason>`
+# line accepts a genuine non-seam on the record, reviewable in the diff.
+[sensors.pmd]
+args = ["--no-progress", "-R", "pmd/ruleset.xml", "--suppress-marker", "foundry-allow-smell"]
+
+# Spotless already removes unused imports, with a classpath; PMD without one misreads them.
+[smells.unused-import]
+disabled = true
 
 # File-length: flag files over 300 lines (oversized-file).
 [sensors.line-count]

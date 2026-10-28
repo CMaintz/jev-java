@@ -1,11 +1,33 @@
 # Foundry six-verb interface for jev-java (Gradle). Self-contained: the reusable
-# _java.yml gate expects PMD/no-var + foundry-verb-wrap infra that this single-package
+# _java.yml gate expects no-var + foundry-verb-wrap infra that this single-package
 # library does not carry, so the verbs map directly to Gradle tasks here and in gate.yml.
-# Structural smells come from the Spotless format check plus the generic habit-hooks
-# sensor (file-length + jscpd); see .habit-hooks/config.toml.
+# Structural smells come from habit-hooks' Java (PMD) and generic plugins; see
+# .habit-hooks/config.toml.
 
 [tools]
 java = "21"
+
+# PMD's release asset has no OS in its name, so it can't be a [tools] entry. setup:pmd
+# installs this version on `mise install`, locally and in the bootstrap workflow, and its
+# bin goes on PATH for the habit-hooks Java sensor.
+[env]
+PMD_VERSION = "7.27.0"
+_.path = ["{{env.HOME}}/.local/opt/pmd-bin-{{env.PMD_VERSION}}/bin"]
+
+[hooks]
+postinstall = "mise run setup:pmd"
+
+[tasks."setup:pmd"]
+description = "Install the pinned PMD if absent (the habit-hooks Java sensor needs it)"
+run = """
+dst="$HOME/.local/opt/pmd-bin-$PMD_VERSION"
+if [ -x "$dst/bin/pmd" ]; then exit 0; fi
+echo "Installing PMD $PMD_VERSION -> $dst"
+mkdir -p "$HOME/.local/opt"
+curl -fsSL -o "/tmp/pmd-$PMD_VERSION.zip" "https://github.com/pmd/pmd/releases/download/pmd_releases/$PMD_VERSION/pmd-dist-$PMD_VERSION-bin.zip"
+unzip -q -o "/tmp/pmd-$PMD_VERSION.zip" -d "$HOME/.local/opt"
+rm -f "/tmp/pmd-$PMD_VERSION.zip"
+"""
 
 [tasks.fix]
 description = "Auto-format (Spotless)"
