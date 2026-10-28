@@ -13,7 +13,7 @@ import java.util.UUID;
 final class Multipart {
 
     /**
-     * An encoded body and the Content-Type header that names its boundary.
+     * An encoded body and its Content-Type header, which for multipart names the boundary.
      *
      * @param bytes the body
      * @param contentType the header value

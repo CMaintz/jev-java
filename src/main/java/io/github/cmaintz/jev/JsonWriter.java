@@ -43,17 +43,21 @@ final class JsonWriter {
             case Number n -> writeNumber(n);
             case Map<?, ?> m -> writeObject(m);
             case Iterable<?> it -> writeArray(it);
-            case Image image -> {
-                images.add(image);
-                writeString(image.reference());
-            }
-            case TextWithImages text -> {
-                images.addAll(text.images());
-                writeString(text.text());
-            }
+            case Image image -> writeImage(image);
+            case TextWithImages text -> writeText(text);
             default -> throw new IllegalArgumentException(
                     "Unsupported JSON value type: " + value.getClass().getName());
         }
+    }
+
+    private void writeImage(Image image) {
+        images.add(image);
+        writeString(image.reference());
+    }
+
+    private void writeText(TextWithImages text) {
+        images.addAll(text.images());
+        writeString(text.text());
     }
 
     private void writeNumber(Number n) {

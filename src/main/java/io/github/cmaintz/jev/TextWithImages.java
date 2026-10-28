@@ -1,6 +1,6 @@
 package io.github.cmaintz.jev;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -37,18 +37,21 @@ public record TextWithImages(String text, List<Image> images) {
      */
     public static TextWithImages of(Object... parts) {
         var text = new StringBuilder();
-        var images = new ArrayList<Image>();
         for (Object part : parts) {
-            Objects.requireNonNull(part, "part");
-            switch (part) {
-                case String s -> text.append(s);
-                case Image image -> {
-                    text.append(image.reference());
-                    images.add(image);
-                }
-                default -> throw new IllegalArgumentException("TextWithImages takes text and images, not " + part);
-            }
+            text.append(textOf(part));
         }
+        var images = Arrays.stream(parts)
+                .filter(Image.class::isInstance)
+                .map(Image.class::cast)
+                .toList();
         return new TextWithImages(text.toString(), images);
+    }
+
+    private static String textOf(Object part) {
+        return switch (Objects.requireNonNull(part, "part")) {
+            case String s -> s;
+            case Image image -> image.reference();
+            default -> throw new IllegalArgumentException("TextWithImages takes text and images, not " + part);
+        };
     }
 }

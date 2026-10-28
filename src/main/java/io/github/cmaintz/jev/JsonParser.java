@@ -18,6 +18,9 @@ final class JsonParser {
      */
     private static final int MAX_DEPTH = 128;
 
+    private static final Map<Character, Character> ESCAPES =
+            Map.of('"', '"', '\\', '\\', '/', '/', 'n', '\n', 'r', '\r', 't', '\t', 'b', '\b', 'f', '\f');
+
     private final String text;
     private int pos;
     private int depth;
@@ -61,40 +64,34 @@ final class JsonParser {
 
     private Map<String, Object> readObject() {
         var map = new LinkedHashMap<String, Object>();
-        pos++; // consume '{'
-        skipWhitespace();
-        if (peek() == '}') {
-            pos++;
-            return map;
-        }
-        while (true) {
-            skipWhitespace();
+        readElements('}', () -> {
             String key = readString();
             skipWhitespace();
             expect(':');
             skipWhitespace();
             map.put(key, readValue());
-            if (!consumeSeparator('}')) {
-                return map;
-            }
-        }
+        });
+        return map;
     }
 
     private List<Object> readArray() {
         var list = new ArrayList<>();
-        pos++; // consume '['
+        readElements(']', () -> list.add(readValue()));
+        return list;
+    }
+
+    /** Consume the opening bracket, then comma-separated elements up to {@code close}. */
+    private void readElements(char close, Runnable readElement) {
+        pos++;
         skipWhitespace();
-        if (peek() == ']') {
+        if (peek() == close) {
             pos++;
-            return list;
+            return;
         }
-        while (true) {
+        do {
             skipWhitespace();
-            list.add(readValue());
-            if (!consumeSeparator(']')) {
-                return list;
-            }
-        }
+            readElement.run();
+        } while (consumeSeparator(close));
     }
 
     /** After a value: consume ',' (continue) or the closing bracket (stop). */
@@ -128,18 +125,15 @@ final class JsonParser {
 
     private void readEscape(StringBuilder out) {
         char c = next();
-        switch (c) {
-            case '"' -> out.append('"');
-            case '\\' -> out.append('\\');
-            case '/' -> out.append('/');
-            case 'n' -> out.append('\n');
-            case 'r' -> out.append('\r');
-            case 't' -> out.append('\t');
-            case 'b' -> out.append('\b');
-            case 'f' -> out.append('\f');
-            case 'u' -> out.append(readUnicode());
-            default -> throw error("invalid escape \\" + c);
+        if (c == 'u') {
+            out.append(readUnicode());
+            return;
         }
+        Character escaped = ESCAPES.get(c);
+        if (escaped == null) {
+            throw error("invalid escape \\" + c);
+        }
+        out.append(escaped.charValue());
     }
 
     private char readUnicode() {

@@ -44,17 +44,17 @@ final class ResponseDecoder {
 
     private Answer answer(Question question, Map<?, ?> node) {
         return switch (question) {
-            case Choice c -> new ChoiceAnswer(
+            case Choice ignored -> new ChoiceAnswer(
                     body.requireString(node, "choice"),
                     doubleMap(node.get("probabilities")),
                     optionalDouble(node, "confidence"));
-            case Score s -> new ScoreAnswer(
+            case Score ignored -> new ScoreAnswer(
                     requireDouble(node, "score"),
                     levelProbabilities(node.get("probabilities")),
                     legend(node.get("legend")),
                     optionalDouble(node, "confidence"));
-            case Noul n -> new NoulAnswer(requireDouble(node, "noul"));
-            case Box b -> box(node);
+            case Noul ignored -> new NoulAnswer(requireDouble(node, "noul"));
+            case Box ignored -> box(node);
         };
     }
 
